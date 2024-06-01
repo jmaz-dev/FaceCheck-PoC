@@ -8,7 +8,7 @@ import androidx.room.Query
 @Dao
 interface UserDao {
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    @Insert
     fun insert(userModel: UserModel)
 
     @Query("SELECT * FROM user WHERE cpf = :cpf")

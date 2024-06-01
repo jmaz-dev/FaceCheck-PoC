@@ -5,19 +5,17 @@ import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
 
-@Database(entities = [UserModel::class], version = 1)
+@Database(entities = [UserModel::class], version = 1, exportSchema = false)
 abstract class InventoryDatabase : RoomDatabase() {
 
     abstract fun userDao(): UserDao
 
     companion object {
-
         private lateinit var INSTANCE: InventoryDatabase
 
-
         fun getDatabase(context: Context): InventoryDatabase {
-            synchronized(InventoryDatabase::class.java) {
-                if (!::INSTANCE.isInitialized) {
+            if (!Companion::INSTANCE.isInitialized) {
+                synchronized(InventoryDatabase::class) {
                     INSTANCE = Room.databaseBuilder(
                         context,
                         InventoryDatabase::class.java,
@@ -25,9 +23,7 @@ abstract class InventoryDatabase : RoomDatabase() {
                     )
                         .allowMainThreadQueries()
                         .build()
-
                 }
-
             }
             return INSTANCE
         }

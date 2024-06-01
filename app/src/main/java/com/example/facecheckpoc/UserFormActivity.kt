@@ -1,11 +1,15 @@
 package com.example.facecheckpoc
 
 import android.Manifest
+import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.os.Bundle
 import android.util.Base64
 import android.util.Log
+import android.view.Menu
+import android.view.MenuItem
 import android.view.View
 import android.widget.Toast
 import androidx.activity.enableEdgeToEdge
@@ -15,16 +19,15 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.ViewModelProvider
-import com.example.facecheckpoc.data.UserModel
 import com.example.facecheckpoc.databinding.ActivityFormUserBinding
 import java.io.ByteArrayOutputStream
 
-class UserFormActivity : AppCompatActivity(), View.OnClickListener {
+class UserFormActivity() : AppCompatActivity(), View.OnClickListener {
 
-    lateinit var binding: ActivityFormUserBinding
-    lateinit var viewModel: FormViewModel
-    var encodedImage: String = ""
+    private lateinit var binding: ActivityFormUserBinding
+    private lateinit var viewModel: UserViewModel
     private lateinit var takePictureLauncher: ActivityResultLauncher<Void?>
+    private var encodedImage: String = ""
 
     companion object {
         private const val REQUEST_CAMERA_PERMISSION = 1
@@ -34,10 +37,14 @@ class UserFormActivity : AppCompatActivity(), View.OnClickListener {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        viewModel = ViewModelProvider(this)[FormViewModel::class.java]
+        viewModel = ViewModelProvider(this).get(UserViewModel::class.java)
         binding = ActivityFormUserBinding.inflate(layoutInflater)
         enableEdgeToEdge()
         setContentView(binding.root)
+        val actionBar = supportActionBar
+        actionBar?.setTitle(getString(R.string.form_title))
+
+
 
 
         binding.buttonSubmit.setOnClickListener(this)
@@ -61,6 +68,22 @@ class UserFormActivity : AppCompatActivity(), View.OnClickListener {
                     useToast("Failed to capture image")
                 }
             }
+    }
+
+    override fun onCreateOptionsMenu(menu: Menu): Boolean {
+        menuInflater.inflate(R.menu.action_settings, menu)
+        return true
+    }
+
+    override fun onOptionsItemSelected(item: MenuItem): Boolean {
+        when (item.itemId) {
+            R.id.action_settings_sub1 -> {
+                startActivity(Intent(this, MainActivity::class.java))
+                return true
+            }
+
+            else -> return super.onOptionsItemSelected(item)
+        }
     }
 
     override fun onClick(v: View) {
@@ -110,18 +133,18 @@ class UserFormActivity : AppCompatActivity(), View.OnClickListener {
     }
 
     private fun handleFormSubmit() {
-        val name = binding.editName.text.toString()
-        val cpf = binding.editCpf.text.toString()
-
-        if (name.isNotEmpty() && cpf.isNotEmpty() && encodedImage.isNotEmpty()) {
-            val user = UserModel()
-            user.name = name
-            user.cpf = cpf
-            user.face = encodedImage
-            viewModel.submitUser(user)
-        } else {
-            useToast("Preencha todos os campos")
-        }
+//        val name = binding.editName.text.toString()
+//        val cpf = binding.editCpf.text.toString()
+//
+//        if (name.isNotEmpty() && cpf.isNotEmpty() && encodedImage.isNotEmpty()) {
+//            val user = UserModel()
+//            user.name = name
+//            user.cpf = cpf
+//            user.face = encodedImage
+//            viewModel.submitUser(user)
+//        } else {
+//            useToast("Preencha todos os campos")
+//        }
     }
 
     private fun useToast(message: String) {

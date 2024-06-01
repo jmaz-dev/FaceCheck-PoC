@@ -21,3 +21,4 @@ dependencyResolutionManagement {
 
 rootProject.name = "FaceCheck PoC"
 include(":app")
+include(":opencvLibrary460")

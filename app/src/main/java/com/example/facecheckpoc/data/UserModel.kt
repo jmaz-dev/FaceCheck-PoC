@@ -5,19 +5,19 @@ import androidx.room.Entity
 import androidx.room.PrimaryKey
 
 @Entity(tableName = "User")
-class UserModel {
+data class UserModel(
+
     @ColumnInfo(name = "id")
-    @PrimaryKey
-    var id: Int = 0
+    @PrimaryKey(autoGenerate = true)
+    var id: Int = 0,
 
     @ColumnInfo(name = "name")
-    var name: String = ""
+    var name: String = "",
 
     @ColumnInfo(name = "cpf")
-    var cpf: String = ""
+    var cpf: String = "",
 
     @ColumnInfo(name = "face")
     var face: String = ""
-
-}
+)
 
