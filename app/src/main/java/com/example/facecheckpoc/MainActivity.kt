@@ -14,6 +14,7 @@ import android.os.Handler
 import android.os.Looper
 import android.util.Log
 import android.view.MenuItem
+import android.view.SurfaceView
 import android.widget.FrameLayout
 import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
@@ -22,6 +23,9 @@ import androidx.lifecycle.Observer
 import androidx.lifecycle.ViewModelProvider
 import com.example.facecheckpoc.data.UserModel
 import com.example.facecheckpoc.databinding.ActivityMainBinding
+import org.opencv.android.CameraBridgeViewBase.CvCameraViewListener2
+import org.opencv.android.OpenCVLoader
+import org.opencv.core.CvType
 import org.opencv.core.Mat
 import org.opencv.core.MatOfRect
 import org.opencv.core.Point
@@ -29,40 +33,85 @@ import org.opencv.core.Rect
 import org.opencv.core.Scalar
 import org.opencv.imgproc.Imgproc
 import org.opencv.objdetect.CascadeClassifier
+import java.io.File
+import java.io.FileOutputStream
 
 
-class MainActivity : AppCompatActivity() {
+class MainActivity : AppCompatActivity(), CvCameraViewListener2 {
 
     private lateinit var binding: ActivityMainBinding
-
     private lateinit var viewModel: UserViewModel
     private lateinit var cameraView: JavaCameraView
     private lateinit var cameraManager: CameraManager
     private lateinit var cameraId: String
     private lateinit var cameraDevice: CameraDevice
-    private lateinit var cameraCharacteristics: CameraCharacteristics
+    private lateinit var mRGBA: Mat
+    private lateinit var mGray: Mat
+    private lateinit var faceCascade: CascadeClassifier
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // Carregar a biblioteca OpenCV
+        if (!OpenCVLoader.initDebug()) {
+            Log.e("MainActivity", "Falha ao carregar OpenCV")
+            return
+        }
+
         binding = ActivityMainBinding.inflate(layoutInflater)
-        viewModel = ViewModelProvider(this).get(UserViewModel::class.java)
+        viewModel = ViewModelProvider(this)[UserViewModel::class.java]
         enableEdgeToEdge()
         setContentView(binding.root)
 
         observe()
 
         val actionBar = supportActionBar
-        actionBar?.setTitle(getString(R.string.main_title))
+        actionBar?.title = getString(R.string.main_title)
         actionBar?.setDisplayHomeAsUpEnabled(true)
 
-        // Inflar o layout
-        val cameraFrame = findViewById<FrameLayout>(R.id.camera_frame)
-        cameraView = JavaCameraView(this, null)
-        cameraFrame.addView(cameraView)
+        // Inicializar cameraView
+        cameraView = findViewById(R.id.camera_view)
+        cameraView.visibility = SurfaceView.VISIBLE
+        cameraView.setCvCameraViewListener(this)
+
+        // Carregar o classificador em cascata
+        val inputStream = resources.openRawResource(R.raw.haarcascade_frontalface_alt2)
+        val cascadeDir = getDir("cascade", Context.MODE_PRIVATE)
+        val mCascadeFile = File(cascadeDir, "haarcascade_frontalface_alt2.xml")
+        val outputStream = FileOutputStream(mCascadeFile)
+
+        val buffer = ByteArray(4096)
+        var bytesRead: Int
+        while (inputStream.read(buffer).also { bytesRead = it } != -1) {
+            outputStream.write(buffer, 0, bytesRead)
+        }
+        inputStream.close()
+        outputStream.close()
+
+        faceCascade = CascadeClassifier(mCascadeFile.absolutePath)
+        if (faceCascade.empty()) {
+            Log.e("MainActivity", "Failed to load cascade classifier")
+            faceCascade = CascadeClassifier()
+        } else {
+            Log.i("MainActivity", "Loaded cascade classifier from " + mCascadeFile.absolutePath)
+        }
 
         // Configurar a câmera
         cameraManager = getSystemService(Context.CAMERA_SERVICE) as CameraManager
         cameraId = cameraManager.cameraIdList[0]
+
+        // Solicitar permissão para a câmera, se necessário
+        if (ActivityCompat.checkSelfPermission(
+                this,
+                Manifest.permission.CAMERA
+            ) != PackageManager.PERMISSION_GRANTED
+        ) {
+            ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.CAMERA), 1)
+        } else {
+            openCamera()
+        }
+    }
+
+    private fun openCamera() {
         val handler = Handler(Looper.getMainLooper())
         if (ActivityCompat.checkSelfPermission(
                 this,
@@ -74,21 +123,26 @@ class MainActivity : AppCompatActivity() {
         cameraManager.openCamera(cameraId, object : CameraDevice.StateCallback() {
             override fun onOpened(camera: CameraDevice) {
                 cameraDevice = camera
-                camera.createCaptureSession(
-                    listOf(cameraView.holder.surface),
-                    object : CameraCaptureSession.StateCallback() {
-                        override fun onConfigured(session: CameraCaptureSession) {
-                            val request = camera.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW)
-                            request.addTarget(cameraView.holder.surface)
-                            session.setRepeatingRequest(request.build(), null, null)
-                        }
+                try {
+                    camera.createCaptureSession(
+                        listOf(cameraView.holder.surface),
+                        object : CameraCaptureSession.StateCallback() {
+                            override fun onConfigured(session: CameraCaptureSession) {
+                                val request =
+                                    camera.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW)
+                                request.addTarget(cameraView.holder.surface)
+                                session.setRepeatingRequest(request.build(), null, null)
+                            }
 
-                        override fun onConfigureFailed(session: CameraCaptureSession) {
-                            Log.e("Camera", "Failed to configure capture session")
-                        }
-                    },
-                    null
-                )
+                            override fun onConfigureFailed(session: CameraCaptureSession) {
+                                Log.e("Camera", "Failed to configure capture session")
+                            }
+                        },
+                        null
+                    )
+                } catch (e: Exception) {
+                    Log.e("Camera", "Error setting up capture session: ${e.message}")
+                }
             }
 
             override fun onDisconnected(camera: CameraDevice) {
@@ -105,6 +159,20 @@ class MainActivity : AppCompatActivity() {
         }, handler)
     }
 
+    override fun onResume() {
+        super.onResume()
+        if (::cameraView.isInitialized) {
+            cameraView.enableView()
+        }
+    }
+
+    override fun onPause() {
+        super.onPause()
+        if (::cameraView.isInitialized) {
+            cameraView.disableView()
+        }
+    }
+
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
         if (item.itemId == android.R.id.home) {
             onBackPressedDispatcher.onBackPressed()
@@ -112,33 +180,49 @@ class MainActivity : AppCompatActivity() {
         return super.onOptionsItemSelected(item)
     }
 
-    private fun detectFaces(frame: Mat) {
-        val grayFrame = Mat()
-        Imgproc.cvtColor(frame, grayFrame, Imgproc.COLOR_RGBA2GRAY)
+    override fun onCameraViewStarted(width: Int, height: Int) {
+        mRGBA = Mat(height, width, CvType.CV_8UC4)
+        mGray = Mat(height, width, CvType.CV_8UC1)
+    }
+
+    override fun onCameraViewStopped() {
+        mRGBA.release()
+        mGray.release()
+    }
+
+    override fun onCameraFrame(inputFrame: CameraBridgeViewBase.CvCameraViewFrame): Mat {
+        mRGBA = inputFrame.rgba()
+        mGray = inputFrame.gray()
+
         val faces = MatOfRect()
-        val faceCascade = CascadeClassifier()
-        faceCascade.detectMultiScale(grayFrame, faces)
+        faceCascade.detectMultiScale(mGray, faces)
+
         for (rect in faces.toArray()) {
-            val userName = getUserNameByFace(rect)
-            if (userName != "UNKNOWN") {
-                Imgproc.rectangle(
-                    frame,
-                    Point(rect.x.toDouble(), rect.y.toDouble()),
-                    Point((rect.x + rect.width).toDouble(), (rect.y + rect.height).toDouble()),
-                    Scalar(0.0, 255.0, 0.0),
-                    3
-                )
+            val cpf = getUserCpfByFace(rect, mRGBA)
+            val user = viewModel.getUserByCpf(cpf)
+
+            Imgproc.rectangle(
+                mRGBA,
+                Point(rect.x.toDouble(), rect.y.toDouble()),
+                Point((rect.x + rect.width).toDouble(), (rect.y + rect.height).toDouble()),
+                if (user != null) Scalar(0.0, 255.0, 0.0) else Scalar(255.0, 0.0, 0.0),
+                3
+            )
+
+            if (user != null) {
+                drawNameOnFace(mRGBA, user.name, rect)
+                runOnUiThread {
+                    updateUserInterface(user)
+                }
             } else {
-                Imgproc.rectangle(
-                    frame,
-                    Point(rect.x.toDouble(), rect.y.toDouble()),
-                    Point((rect.x + rect.width).toDouble(), (rect.y + rect.height).toDouble()),
-                    Scalar(255.0, 0.0, 0.0),
-                    3
-                )
+                runOnUiThread {
+                    binding.textName.text = "Unknown"
+                    binding.textCpf.text = ""
+                }
             }
-            drawNameOnFace(frame, userName, rect)
         }
+
+        return mRGBA
     }
 
     private fun drawNameOnFace(frame: Mat, userName: String, rect: Rect) {
@@ -158,12 +242,6 @@ class MainActivity : AppCompatActivity() {
         )
     }
 
-    private fun getUserNameByFace(rect: Rect): String {
-        val cpf = getUserCpfByFace(rect)
-        val user = viewModel.getUserByCpf(cpf)
-        return user?.name ?: "UNKNOWN"
-    }
-
     private fun observe() {
         viewModel.userModel.observe(this, Observer { user ->
             user?.let { updateUserInterface(it) }
@@ -171,13 +249,43 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun updateUserInterface(user: UserModel) {
-        // Atualizar a interface do usuário com as informações do usuário
+        runOnUiThread {
+            binding.textName.text = user.name
+            binding.textCpf.text = user.cpf
+        }
     }
 
-    private fun getUserCpfByFace(rect: Rect): String {
-        // Implementar lógica para obter o CPF com base no rosto detectado
-        // Você pode usar o rosto detectado para buscar o CPF no banco de dados
-        // ou gerar um CPF fictício para fins de demonstração
-        return "12345678901"
+    private fun getUserCpfByFace(rect: Rect, frame: Mat): String {
+        val grayFrame = Mat()
+        Imgproc.cvtColor(frame, grayFrame, Imgproc.COLOR_RGBA2GRAY)
+
+        val faceCascade = CascadeClassifier()
+        val inputStream = resources.openRawResource(R.raw.haarcascade_frontalface_alt2)
+        val file = File(filesDir, "haarcascade_frontalface_alt2.xml")
+        val fileOutputStream = FileOutputStream(file)
+
+        val buffer = ByteArray(4096)
+        var bytesRead: Int
+        while (inputStream.read(buffer).also { bytesRead = it } != -1) {
+            fileOutputStream.write(buffer, 0, bytesRead)
+        }
+        inputStream.close()
+        fileOutputStream.close()
+
+        faceCascade.load(file.absolutePath)
+
+        val faces = MatOfRect()
+        faceCascade.detectMultiScale(grayFrame, faces)
+
+        for (face in faces.toArray()) {
+            if (face.x <= rect.x && face.x + face.width >= rect.x + rect.width &&
+                face.y <= rect.y && face.y + face.height >= rect.y + rect.height
+            ) {
+                // Buscar o CPF do usuário correspondente ao rosto detectado
+                return "12345678901"
+            }
+        }
+
+        return ""
     }
 }

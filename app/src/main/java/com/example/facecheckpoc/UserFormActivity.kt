@@ -19,6 +19,7 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.ViewModelProvider
+import com.example.facecheckpoc.data.UserModel
 import com.example.facecheckpoc.databinding.ActivityFormUserBinding
 import java.io.ByteArrayOutputStream
 
@@ -31,6 +32,7 @@ class UserFormActivity() : AppCompatActivity(), View.OnClickListener {
 
     companion object {
         private const val REQUEST_CAMERA_PERMISSION = 1
+        private var IS_PICTURE_TAKED = 0
         private const val TAG = "UserFormActivity"
     }
 
@@ -39,35 +41,19 @@ class UserFormActivity() : AppCompatActivity(), View.OnClickListener {
 
         viewModel = ViewModelProvider(this).get(UserViewModel::class.java)
         binding = ActivityFormUserBinding.inflate(layoutInflater)
+
         enableEdgeToEdge()
+
         setContentView(binding.root)
-        val actionBar = supportActionBar
-        actionBar?.setTitle(getString(R.string.form_title))
 
-
-
+        supportActionBar?.setTitle(getString(R.string.form_title))
 
         binding.buttonSubmit.setOnClickListener(this)
         binding.imageCapture.setOnClickListener(this)
 
-        takePictureLauncher =
-            registerForActivityResult(ActivityResultContracts.TakePicturePreview()) { bitmap ->
-                if (bitmap != null) {
-                    // Converta o bitmap para um array de bytes
-                    val byteArrayOutputStream = ByteArrayOutputStream()
-                    bitmap.compress(Bitmap.CompressFormat.PNG, 100, byteArrayOutputStream)
-                    val byteArray = byteArrayOutputStream.toByteArray()
+        pictureLauncher()
 
-                    // Converta o array de bytes para uma string Base64
-                    encodedImage = Base64.encodeToString(byteArray, Base64.DEFAULT)
-
-                    // Exiba a imagem no ImageView, se necessário
-                    binding.imageCapture.setImageBitmap(bitmap)
-                } else {
-                    Log.d(TAG, "Bitmap is null")
-                    useToast("Failed to capture image")
-                }
-            }
+        observeViewModel()
     }
 
     override fun onCreateOptionsMenu(menu: Menu): Boolean {
@@ -115,6 +101,29 @@ class UserFormActivity() : AppCompatActivity(), View.OnClickListener {
         }
     }
 
+    private fun pictureLauncher() {
+        takePictureLauncher =
+            registerForActivityResult(ActivityResultContracts.TakePicturePreview()) { bitmap ->
+                if (bitmap != null) {
+                    // Converta o bitmap para um array de bytes
+                    val byteArrayOutputStream = ByteArrayOutputStream()
+                    bitmap.compress(Bitmap.CompressFormat.PNG, 100, byteArrayOutputStream)
+                    val byteArray = byteArrayOutputStream.toByteArray()
+
+                    // Converta o array de bytes para uma string Base64
+                    encodedImage = Base64.encodeToString(byteArray, Base64.DEFAULT)
+
+                    // Exiba a imagem no ImageView, se necessário
+                    binding.imageCapture.setImageBitmap(bitmap)
+
+                    IS_PICTURE_TAKED = 1
+                } else {
+                    Log.d(TAG, "Bitmap is null")
+                    useToast("Failed to capture image")
+                }
+            }
+    }
+
     private fun handleImageCapture() {
 
         if (ContextCompat.checkSelfPermission(
@@ -133,18 +142,33 @@ class UserFormActivity() : AppCompatActivity(), View.OnClickListener {
     }
 
     private fun handleFormSubmit() {
-//        val name = binding.editName.text.toString()
-//        val cpf = binding.editCpf.text.toString()
-//
-//        if (name.isNotEmpty() && cpf.isNotEmpty() && encodedImage.isNotEmpty()) {
-//            val user = UserModel()
-//            user.name = name
-//            user.cpf = cpf
-//            user.face = encodedImage
-//            viewModel.submitUser(user)
-//        } else {
-//            useToast("Preencha todos os campos")
-//        }
+        val name = binding.editName.text.toString()
+        val cpf = binding.editCpf.text.toString()
+
+        if (name.isNotEmpty() && cpf.isNotEmpty() && IS_PICTURE_TAKED == 1) {
+            val user = UserModel()
+            user.name = name
+            user.cpf = cpf
+            user.face = encodedImage
+            viewModel.submitUser(user)
+
+        } else {
+            useToast("Preencha todos os campos")
+        }
+    }
+
+    private fun observeViewModel() {
+        viewModel.userSubmit.observe(this) {
+            if (it) {
+                useToast("Usuário cadastrado com sucesso")
+                binding.editName.setText("")
+                binding.editCpf.setText("")
+                binding.imageCapture.setImageResource(R.drawable.ic_image)
+                IS_PICTURE_TAKED = 0
+            } else {
+                useToast("Ocorreu um erro ao tentar cadastrar")
+            }
+        }
     }
 
     private fun useToast(message: String) {
