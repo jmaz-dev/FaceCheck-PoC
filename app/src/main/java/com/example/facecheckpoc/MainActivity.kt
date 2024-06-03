@@ -1,13 +1,12 @@
 package com.example.facecheckpoc
 
-import org.opencv.android.JavaCameraView
 import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
+import android.hardware.camera2.CameraAccessException
 import android.hardware.camera2.CameraCaptureSession
 import android.hardware.camera2.CameraCharacteristics
 import android.hardware.camera2.CameraDevice
-import org.opencv.android.CameraBridgeViewBase
 import android.hardware.camera2.CameraManager
 import android.os.Bundle
 import android.os.Handler
@@ -15,7 +14,6 @@ import android.os.Looper
 import android.util.Log
 import android.view.MenuItem
 import android.view.SurfaceView
-import android.widget.FrameLayout
 import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
@@ -23,7 +21,9 @@ import androidx.lifecycle.Observer
 import androidx.lifecycle.ViewModelProvider
 import com.example.facecheckpoc.data.UserModel
 import com.example.facecheckpoc.databinding.ActivityMainBinding
+import org.opencv.android.CameraBridgeViewBase
 import org.opencv.android.CameraBridgeViewBase.CvCameraViewListener2
+import org.opencv.android.JavaCameraView
 import org.opencv.android.OpenCVLoader
 import org.opencv.core.CvType
 import org.opencv.core.Mat
@@ -51,6 +51,7 @@ class MainActivity : AppCompatActivity(), CvCameraViewListener2 {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
         // Carregar a biblioteca OpenCV
         if (!OpenCVLoader.initDebug()) {
             Log.e("MainActivity", "Falha ao carregar OpenCV")
@@ -97,7 +98,7 @@ class MainActivity : AppCompatActivity(), CvCameraViewListener2 {
 
         // Configurar a câmera
         cameraManager = getSystemService(Context.CAMERA_SERVICE) as CameraManager
-        cameraId = cameraManager.cameraIdList[0]
+        cameraId = getFrontCameraId() ?: return
 
         // Solicitar permissão para a câmera, se necessário
         if (ActivityCompat.checkSelfPermission(
@@ -109,6 +110,20 @@ class MainActivity : AppCompatActivity(), CvCameraViewListener2 {
         } else {
             openCamera()
         }
+    }
+
+    private fun getFrontCameraId(): String? {
+        try {
+            for (id in cameraManager.cameraIdList) {
+                val characteristics = cameraManager.getCameraCharacteristics(id)
+                if (characteristics.get(CameraCharacteristics.LENS_FACING) == CameraCharacteristics.LENS_FACING_FRONT) {
+                    return id
+                }
+            }
+        } catch (e: CameraAccessException) {
+            e.printStackTrace()
+        }
+        return null
     }
 
     private fun openCamera() {
@@ -198,7 +213,7 @@ class MainActivity : AppCompatActivity(), CvCameraViewListener2 {
         faceCascade.detectMultiScale(mGray, faces)
 
         for (rect in faces.toArray()) {
-            val cpf = getUserCpfByFace(rect, mRGBA)
+            val cpf = getUserCpfByFace(rect)
             val user = viewModel.getUserByCpf(cpf)
 
             Imgproc.rectangle(
@@ -242,6 +257,12 @@ class MainActivity : AppCompatActivity(), CvCameraViewListener2 {
         )
     }
 
+    private fun getUserCpfByFace(rect: Rect): String {
+        // Implementar a lógica para obter o CPF do usuário com base no rosto detectado.
+        // Este exemplo retorna um CPF fixo. Substitua pela sua lógica real.
+        return "12345678901"
+    }
+
     private fun observe() {
         viewModel.userModel.observe(this, Observer { user ->
             user?.let { updateUserInterface(it) }
@@ -254,38 +275,40 @@ class MainActivity : AppCompatActivity(), CvCameraViewListener2 {
             binding.textCpf.text = user.cpf
         }
     }
-
-    private fun getUserCpfByFace(rect: Rect, frame: Mat): String {
-        val grayFrame = Mat()
-        Imgproc.cvtColor(frame, grayFrame, Imgproc.COLOR_RGBA2GRAY)
-
-        val faceCascade = CascadeClassifier()
-        val inputStream = resources.openRawResource(R.raw.haarcascade_frontalface_alt2)
-        val file = File(filesDir, "haarcascade_frontalface_alt2.xml")
-        val fileOutputStream = FileOutputStream(file)
-
-        val buffer = ByteArray(4096)
-        var bytesRead: Int
-        while (inputStream.read(buffer).also { bytesRead = it } != -1) {
-            fileOutputStream.write(buffer, 0, bytesRead)
-        }
-        inputStream.close()
-        fileOutputStream.close()
-
-        faceCascade.load(file.absolutePath)
-
-        val faces = MatOfRect()
-        faceCascade.detectMultiScale(grayFrame, faces)
-
-        for (face in faces.toArray()) {
-            if (face.x <= rect.x && face.x + face.width >= rect.x + rect.width &&
-                face.y <= rect.y && face.y + face.height >= rect.y + rect.height
-            ) {
-                // Buscar o CPF do usuário correspondente ao rosto detectado
-                return "12345678901"
-            }
-        }
-
-        return ""
-    }
 }
+
+
+//private fun getUserCpfByFace(rect: Rect, frame: Mat): String {
+//    val grayFrame = Mat()
+//    Imgproc.cvtColor(frame, grayFrame, Imgproc.COLOR_RGBA2GRAY)
+//
+//    val faceCascade = CascadeClassifier()
+//    val inputStream = resources.openRawResource(R.raw.haarcascade_frontalface_alt2)
+//    val file = File(filesDir, "haarcascade_frontalface_alt2.xml")
+//    val fileOutputStream = FileOutputStream(file)
+//
+//    val buffer = ByteArray(4096)
+//    var bytesRead: Int
+//    while (inputStream.read(buffer).also { bytesRead = it } != -1) {
+//        fileOutputStream.write(buffer, 0, bytesRead)
+//    }
+//    inputStream.close()
+//    fileOutputStream.close()
+//
+//    faceCascade.load(file.absolutePath)
+//
+//    val faces = MatOfRect()
+//    faceCascade.detectMultiScale(grayFrame, faces)
+//
+//    for (face in faces.toArray()) {
+//        if (face.x <= rect.x && face.x + face.width >= rect.x + rect.width &&
+//            face.y <= rect.y && face.y + face.height >= rect.y + rect.height
+//        ) {
+//            // Buscar o CPF do usuário correspondente ao rosto detectado
+//            return "12345678901"
+//        }
+//    }
+//
+//    return ""
+//}
+//}

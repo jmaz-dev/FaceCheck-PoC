@@ -163,7 +163,7 @@ class UserFormActivity() : AppCompatActivity(), View.OnClickListener {
                 useToast("Usuário cadastrado com sucesso")
                 binding.editName.setText("")
                 binding.editCpf.setText("")
-                binding.imageCapture.setImageResource(R.drawable.ic_image)
+                binding.imageCapture.setImageResource(R.drawable.ic_person)
                 IS_PICTURE_TAKED = 0
             } else {
                 useToast("Ocorreu um erro ao tentar cadastrar")
