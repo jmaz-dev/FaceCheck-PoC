@@ -105,6 +105,21 @@ class UserFormActivity() : AppCompatActivity(), View.OnClickListener {
         takePictureLauncher =
             registerForActivityResult(ActivityResultContracts.TakePicturePreview()) { bitmap ->
                 if (bitmap != null) {
+                    val displayMetrics = resources.displayMetrics
+                    val screenWidthDp = displayMetrics.widthPixels / displayMetrics.density
+                    // Verifica se a tela é de um celular (considerando telas menores que 600dp como celulares)
+                    val isCelular = screenWidthDp < 600
+
+                    val bitmapToUse = if (isCelular) {
+                        // Redimensiona a imagem para celulares
+                        val newWidth = (screenWidthDp * 0.8).toInt() // 80% da largura da tela
+                        val newHeight = (bitmap.height * newWidth) / bitmap.width
+                        Bitmap.createScaledBitmap(bitmap, newWidth, newHeight, true)
+                    } else {
+                        // Mantém a imagem original para tablets
+                        bitmap
+                    }
+
                     // Converta o bitmap para um array de bytes
                     val byteArrayOutputStream = ByteArrayOutputStream()
                     bitmap.compress(Bitmap.CompressFormat.PNG, 100, byteArrayOutputStream)
@@ -113,8 +128,9 @@ class UserFormActivity() : AppCompatActivity(), View.OnClickListener {
                     // Converta o array de bytes para uma string Base64
                     encodedImage = Base64.encodeToString(byteArray, Base64.DEFAULT)
 
-                    // Exiba a imagem no ImageView, se necessário
-                    binding.imageCapture.setImageBitmap(bitmap)
+                    // Exiba a imagem no ImageView
+                    binding.imageCapture.setImageBitmap(bitmapToUse)
+                    binding.imageCapture.background= getDrawable(R.drawable.rounded_corners)
 
                     IS_PICTURE_TAKED = 1
                 } else {

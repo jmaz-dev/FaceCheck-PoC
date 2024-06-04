@@ -2,4 +2,12 @@
     <string name="app_name">FaceCheck PoC</string>
     <string name="form_title">Registrar</string>
     <string name="main_title">Análise facial</string>
+    <string name="face_verification">Verificação facial</string>
+    <string name="init_camera">Iniciando câmera...</string>
+    <string name="btn_cancel">Cancelar</string>\
+    <string name="front_camera">Câmera frontal</string>
+    <string name="try_again">Tentar novamente</string>
+    <string name="approve">Aprovar</string>
+    <string name="face_verification_failed_approve">Não foi possível verificar a face! Clique no botão APROVAR abaixo para aprovar manualmente, se desejar.</string>
+    <string name="verifying_face">Verificando face...</string>
 </resources>
