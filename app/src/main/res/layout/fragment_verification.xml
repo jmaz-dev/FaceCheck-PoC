@@ -5,7 +5,7 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:padding="16dp"
-        tools:context=".ui.verification.VerificationFragment">
+        tools:context=".verification.VerificationFragment">
 
     <com.google.android.material.textview.MaterialTextView
             style="@style/TextAppearance.MaterialComponents.Headline6"
@@ -15,7 +15,7 @@
             android:text="@string/face_verification"
             app:layout_constraintTop_toTopOf="parent"
             app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintEnd_toEndOf="parent"/>
+            app:layout_constraintEnd_toEndOf="parent" />
 
     <androidx.camera.view.PreviewView
             android:id="@+id/view_finder"
@@ -27,7 +27,7 @@
             app:layout_constraintTop_toBottomOf="@id/title"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintDimensionRatio="H,1:1"/>
+            app:layout_constraintDimensionRatio="H,1:1" />
 
     <ImageView
             android:id="@+id/imageView"
@@ -49,9 +49,9 @@
             app:layout_constraintEnd_toEndOf="@id/view_finder"
             app:layout_constraintTop_toTopOf="@id/view_finder"
             app:layout_constraintBottom_toBottomOf="@id/view_finder"
-            app:lottie_rawRes="@raw/scanning_animation_2"
+            app:lottie_rawRes="@raw/scanning_annimation"
             app:lottie_autoPlay="true"
-            app:lottie_loop="true"/>
+            app:lottie_loop="true" />
 
     <com.google.android.material.textview.MaterialTextView
             style="@style/TextAppearance.MaterialComponents.Body1"
@@ -98,7 +98,7 @@
             android:layout_marginEnd="16dp"
             app:layout_constraintEnd_toStartOf="@id/cancelButton"
             app:layout_constraintTop_toBottomOf="@id/infoText"
-            android:visibility="gone"/>
+            android:visibility="gone" />
 
     <com.google.android.material.button.MaterialButton
             style="@style/Widget.MaterialComponents.Button.TextButton"
@@ -110,6 +110,6 @@
             android:layout_marginEnd="16dp"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toBottomOf="@id/infoText"
-            android:visibility="gone"/>
+            android:visibility="gone" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>

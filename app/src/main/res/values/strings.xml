@@ -10,4 +10,10 @@
     <string name="approve">Aprovar</string>
     <string name="face_verification_failed_approve">Não foi possível verificar a face! Clique no botão APROVAR abaixo para aprovar manualmente, se desejar.</string>
     <string name="verifying_face">Verificando face...</string>
+    <string name="back_camera">Câmera traseira</string>
+    <string name="detecting_face">Detectando rosto...</string>
+    <string name="face_not_centered">Face não centralizada</string>
+    <string name="face_too_far">Face muito distante</string>
+    <string name="face_too_close">Face muito próxima</string>
+    <string name="face_invalid_angles">Não foi possível verficar a face!</string>
 </resources>

@@ -15,8 +15,11 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.camera.core.AspectRatio
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ExperimentalGetImage
+import androidx.camera.core.ImageAnalysis
+import androidx.camera.view.CameraController
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.DialogFragment
 import androidx.lifecycle.LifecycleOwner
@@ -25,6 +28,8 @@ import com.airbnb.lottie.LottieDrawable
 import com.example.facecheckpoc.R
 import com.example.facecheckpoc.databinding.FragmentVerificationBinding
 import com.example.facecheckpoc.utils.setWidthPercent
+import com.google.mlkit.vision.common.InputImage
+import com.google.mlkit.vision.face.Face
 import com.google.mlkit.vision.face.FaceDetection
 import com.google.mlkit.vision.face.FaceDetectorOptions
 import kotlinx.coroutines.Dispatchers
@@ -47,12 +52,15 @@ import java.text.DecimalFormat
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
+import kotlin.math.abs
 
-@ExperimentalGetImage class VerificationFragment(
+@ExperimentalGetImage
+class VerificationFragment(
     private val image: Bitmap,
     private val resultListener: OnResultListener? = null,
-    private val threshold : Float,
-    private val defaultFrontCamera: Boolean = true) : DialogFragment() {
+    private val threshold: Float,
+    private val defaultFrontCamera: Boolean = true
+) : DialogFragment() {
 
     private lateinit var binding: FragmentVerificationBinding
     private lateinit var cameraController: LifecycleCameraController
@@ -60,14 +68,16 @@ import java.util.concurrent.atomic.AtomicBoolean
     private val executor = Executors.newSingleThreadExecutor()
     private var isProcessing = AtomicBoolean(false)
     private var flipX = defaultFrontCamera
-    private var cameraSelector: CameraSelector = if (defaultFrontCamera) CameraSelector.DEFAULT_FRONT_CAMERA else CameraSelector.DEFAULT_BACK_CAMERA
+    private var cameraSelector: CameraSelector =
+        if (defaultFrontCamera) CameraSelector.DEFAULT_FRONT_CAMERA else CameraSelector.DEFAULT_BACK_CAMERA
     private var inputSize = 112 //Input size for model
     private var IMAGE_MEAN = 128.0f
     private var IMAGE_STD = 128.0f
     private var OUTPUT_SIZE = 192 //Output size of model
     private var compareEmbedding: FloatArray? = null
     private var modelFile = "mobile_face_net.tflite" //model name
-    private var verification: VerificationResult = VerificationResult(image = image.copy(image.config, false))
+    private var verification: VerificationResult =
+        VerificationResult(image = image.copy(image.config, false))
     private var topVerifications = sortedMapOf<Float, Bitmap>()
     private var minVerifications = 3
     private var faceDetected = false
@@ -90,10 +100,13 @@ import java.util.concurrent.atomic.AtomicBoolean
         NnApiDelegate()
     }
     private val tfLite by lazy {
-        Interpreter(loadModelFile(requireContext(), modelFile), Interpreter.Options().addDelegate(nnApiDelegate))
+        Interpreter(
+            loadModelFile(requireContext(), modelFile),
+            Interpreter.Options().addDelegate(nnApiDelegate)
+        )
     }
 
-    //ML KIT
+    //ML KIT Initialize the face detector
     private val detector by lazy {
         val highAccuracyOpts: FaceDetectorOptions = FaceDetectorOptions.Builder()
             .setPerformanceMode(FaceDetectorOptions.PERFORMANCE_MODE_ACCURATE)
@@ -104,8 +117,9 @@ import java.util.concurrent.atomic.AtomicBoolean
 
     private val getPermissionResult =
         registerForActivityResult(
-            ActivityResultContracts.RequestPermission()) {
-            if(it){
+            ActivityResultContracts.RequestPermission()
+        ) {
+            if (it) {
                 bindCamera()
             } else {
                 Toast.makeText(
@@ -127,7 +141,8 @@ import java.util.concurrent.atomic.AtomicBoolean
         binding = FragmentVerificationBinding.inflate(
             LayoutInflater.from(
                 context
-            ))
+            )
+        )
 
         isCancelable = false
 
@@ -137,11 +152,13 @@ import java.util.concurrent.atomic.AtomicBoolean
 
         binding.cameraSwitch.setOnClickListener(View.OnClickListener {
             if (cameraSelector == CameraSelector.DEFAULT_BACK_CAMERA &&
-                cameraController.hasCamera(CameraSelector.DEFAULT_FRONT_CAMERA)) {
+                cameraController.hasCamera(CameraSelector.DEFAULT_FRONT_CAMERA)
+            ) {
                 cameraSelector = CameraSelector.DEFAULT_FRONT_CAMERA
                 flipX = true
             } else if (cameraSelector == CameraSelector.DEFAULT_FRONT_CAMERA &&
-                cameraController.hasCamera(CameraSelector.DEFAULT_BACK_CAMERA)) {
+                cameraController.hasCamera(CameraSelector.DEFAULT_BACK_CAMERA)
+            ) {
                 cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA
                 flipX = false
             }
@@ -251,7 +268,9 @@ import java.util.concurrent.atomic.AtomicBoolean
             awaitTermination(1000, TimeUnit.MILLISECONDS)
         }
 
+        //ml kit
         detector.close()
+        //tensorflow
         tfLite.close()
         nnApiDelegate.close()
 
@@ -284,90 +303,103 @@ import java.util.concurrent.atomic.AtomicBoolean
         cameraController.initializationFuture.addListener({
             try {
                 if (cameraSelector == CameraSelector.DEFAULT_BACK_CAMERA &&
-                    !cameraController.hasCamera(CameraSelector.DEFAULT_BACK_CAMERA)) {
+                    !cameraController.hasCamera(CameraSelector.DEFAULT_BACK_CAMERA)
+                ) {
                     cameraSelector = CameraSelector.DEFAULT_FRONT_CAMERA
                     flipX = true
                 } else if (cameraSelector == CameraSelector.DEFAULT_FRONT_CAMERA &&
-                    !cameraController.hasCamera(CameraSelector.DEFAULT_FRONT_CAMERA)) {
+                    !cameraController.hasCamera(CameraSelector.DEFAULT_FRONT_CAMERA)
+                ) {
                     cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA
                     flipX = false
                 }
 
                 setCameraText()
 
-                cameraController.previewTargetSize = CameraController.OutputSize(AspectRatio.RATIO_4_3)
-                cameraController.imageAnalysisTargetSize = CameraController.OutputSize(AspectRatio.RATIO_4_3)
-                cameraController.imageAnalysisBackpressureStrategy = ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST
+                // Set the camera selector and preview size
+                cameraController.previewTargetSize =
+                    CameraController.OutputSize(AspectRatio.RATIO_4_3)
+                cameraController.imageAnalysisTargetSize =
+                    CameraController.OutputSize(AspectRatio.RATIO_4_3)
+                cameraController.imageAnalysisBackpressureStrategy =
+                    ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST
                 cameraController.cameraSelector = cameraSelector
                 cameraController.setEnabledUseCases(CameraController.IMAGE_ANALYSIS)
-                cameraController.setImageAnalysisAnalyzer(executor, ImageAnalysis.Analyzer { imageProxy ->
-                    if (!faceDetected) {
-                        faceDetected = true
-                        startTimeMs = System.currentTimeMillis()
-                        lifecycleScope.launch(Dispatchers.Main) {
-                            binding.infoText.text = getString(R.string.detecting_face)
-                        }
-                    }
-
-                    val mediaImage = imageProxy.image
-                    if (isPaused || mediaImage == null) {
-                        imageProxy.close()
-                        return@Analyzer
-                    }
-
-                    var rotation = imageProxy.imageInfo.rotationDegrees
-                    if (isEmulator) {
-                        rotation -= 90
-                    }
-
-                    val frameBmp = rotateBitmap(
-                        mediaImage.toBitmap(), rotation, false, false
-                    )
-
-                    val image = InputImage.fromBitmap(frameBmp, 0)
-
-                    detector.process(image)
-                        .addOnSuccessListener { faces ->
-                            Log.d("FaceDetector", "Face count: ${faces.count()}")
-
-                            if (isProcessing.get() || isPaused) {
-                                return@addOnSuccessListener
-                            }
-
-                            if ((System.currentTimeMillis() - startTimeMs) >= maxVerificationTimems) {
-                                showFailedAnimation()
-                                return@addOnSuccessListener
-                            }
-
-                            val face = faces.maxByOrNull { f -> f.boundingBox.height() }
-
-                            if (face == null) {
+                cameraController.setImageAnalysisAnalyzer(
+                    executor,
+                    ImageAnalysis.Analyzer { imageProxy ->
+                        if (!faceDetected) {
+                            faceDetected = true
+                            startTimeMs = System.currentTimeMillis()
+                            lifecycleScope.launch(Dispatchers.Main) {
                                 binding.infoText.text = getString(R.string.detecting_face)
-                            } else if (face.boundingBox.left < 0.1 * frameBmp.width || face.boundingBox.right > 0.9 * frameBmp.width ||
-                                face.boundingBox.top < 0.1 * frameBmp.height || face.boundingBox.bottom > 0.9 * frameBmp.height
-                            ) {
-                                binding.infoText.text = getString(R.string.face_not_centered)
-                            } else if (face.boundingBox.height() < (0.25 * frameBmp.height)) {
-                                binding.infoText.text = getString(R.string.face_too_far)
-                            } else if (face.boundingBox.height() > (0.5 * frameBmp.height)) {
-                                binding.infoText.text = getString(R.string.face_too_close)
-                            } else if (abs(face.headEulerAngleY) > 15 || abs(face.headEulerAngleX) > 15 || abs(face.headEulerAngleZ) > 15) {
-                                binding.infoText.text = getString(R.string.face_invalid_angles)
-                            } else if (!verification.verified) {
-                                isProcessing.set(true)
-                                lifecycleScope.launch(Dispatchers.Default) {
-                                    processFrame(face, frameBmp)
-                                }
-                                binding.infoText.text = getString(R.string.verifying_face)
                             }
                         }
-                        .addOnFailureListener {
-                            val ex = it
-                        }
-                        .addOnCompleteListener {
+
+                        val mediaImage = imageProxy.image
+                        if (isPaused || mediaImage == null) {
                             imageProxy.close()
+                            return@Analyzer
                         }
-                })
+
+                        var rotation = imageProxy.imageInfo.rotationDegrees
+                        if (isEmulator) {
+                            rotation -= 90
+                        }
+
+                        val frameBmp = rotateBitmap(
+                            mediaImage.toBitmap(), rotation, false, false
+                        )
+
+                        val image = InputImage.fromBitmap(frameBmp, 0)
+
+                        detector.process(image)
+                            .addOnSuccessListener { faces ->
+                                Log.d("FaceDetector", "Face count: ${faces.count()}")
+
+                                if (isProcessing.get() || isPaused) {
+                                    return@addOnSuccessListener
+                                }
+
+                                if ((System.currentTimeMillis() - startTimeMs) >= maxVerificationTimems) {
+                                    showFailedAnimation()
+                                    return@addOnSuccessListener
+                                }
+
+                                // Get the face with the highest bounding box
+                                val face = faces.maxByOrNull { f -> f.boundingBox.height() }
+
+                                // Check if the face is null or not centered
+                                if (face == null) {
+                                    binding.infoText.text = getString(R.string.detecting_face)
+                                } else if (face.boundingBox.left < 0.1 * frameBmp.width || face.boundingBox.right > 0.9 * frameBmp.width ||
+                                    face.boundingBox.top < 0.1 * frameBmp.height || face.boundingBox.bottom > 0.9 * frameBmp.height
+                                ) {
+                                    binding.infoText.text = getString(R.string.face_not_centered)
+                                } else if (face.boundingBox.height() < (0.25 * frameBmp.height)) {
+                                    binding.infoText.text = getString(R.string.face_too_far)
+                                } else if (face.boundingBox.height() > (0.5 * frameBmp.height)) {
+                                    binding.infoText.text = getString(R.string.face_too_close)
+                                } else if (abs(face.headEulerAngleY) > 15 || abs(face.headEulerAngleX) > 15 || abs(
+                                        face.headEulerAngleZ
+                                    ) > 15
+                                ) {
+                                    binding.infoText.text = getString(R.string.face_invalid_angles)
+                                } else if (!verification.verified) {
+                                    isProcessing.set(true)
+                                    lifecycleScope.launch(Dispatchers.Default) {
+                                        processFrame(face, frameBmp)
+                                    }
+                                    binding.infoText.text = getString(R.string.verifying_face)
+                                }
+                            }
+                            .addOnFailureListener {
+                                val ex = it
+                            }
+                            .addOnCompleteListener {
+                                imageProxy.close()
+                            }
+                    })
 
                 cameraController.bindToLifecycle(this as LifecycleOwner)
                 binding.viewFinder.controller = cameraController
@@ -377,6 +409,7 @@ import java.util.concurrent.atomic.AtomicBoolean
         }, ContextCompat.getMainExecutor(requireContext()))
     }
 
+    // Process the frame and compare the embeddings
     private suspend fun processFrame(face: Face, bmp: Bitmap) = coroutineScope {
         try {
             var verificationImage = bmp.copy(bmp.config, false)
@@ -434,7 +467,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 
     private fun runInference(bitmap: Bitmap): FloatArray {
         // Process the image in Tensorflow
-        val tfImage =  tfImageProcessor.process(tfImageBuffer.apply { load(bitmap) })
+        val tfImage = tfImageProcessor.process(tfImageBuffer.apply { load(bitmap) })
 
         //imgData is input to our model
         val inputArray = arrayOf<Any>(tfImage.buffer)
@@ -475,15 +508,17 @@ import java.util.concurrent.atomic.AtomicBoolean
             binding.animation.visibility = View.VISIBLE
             binding.animation.playAnimation()
             binding.animation.removeAllAnimatorListeners()
-            binding.animation.addAnimatorListener(object : Animator.AnimatorListener{
+            binding.animation.addAnimatorListener(object : Animator.AnimatorListener {
                 override fun onAnimationStart(p0: Animator) {}
                 override fun onAnimationEnd(p0: Animator) {
                     dismiss()
                 }
+
                 override fun onAnimationCancel(p0: Animator) {}
                 override fun onAnimationRepeat(p0: Animator) {}
             })
-        } catch (e: Exception) {}
+        } catch (e: Exception) {
+        }
     }
 
     private fun showFailedAnimation() {
@@ -500,11 +535,12 @@ import java.util.concurrent.atomic.AtomicBoolean
         binding.animation.visibility = View.VISIBLE
         binding.animation.playAnimation()
         binding.animation.removeAllAnimatorListeners()
-        binding.animation.addAnimatorListener(object : Animator.AnimatorListener{
+        binding.animation.addAnimatorListener(object : Animator.AnimatorListener {
             override fun onAnimationStart(p0: Animator) {}
             override fun onAnimationEnd(p0: Animator) {
                 showVerificationApproval()
             }
+
             override fun onAnimationCancel(p0: Animator) {}
             override fun onAnimationRepeat(p0: Animator) {}
         })
