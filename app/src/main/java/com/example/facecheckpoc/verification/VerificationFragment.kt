@@ -1,3 +1,4 @@
+/*
 package com.example.facecheckpoc.verification
 
 import android.Manifest
@@ -573,4 +574,4 @@ class VerificationFragment(
     interface OnResultListener {
         fun onResult(verification: VerificationResult)
     }
-}
+}*/

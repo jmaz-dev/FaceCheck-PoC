@@ -5,7 +5,7 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:padding="16dp"
-        tools:context=".verification.VerificationFragment">
+        tools:context=".verification.Verification2Fragment">
 
     <com.google.android.material.textview.MaterialTextView
             style="@style/TextAppearance.MaterialComponents.Headline6"
@@ -29,6 +29,7 @@
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintDimensionRatio="H,1:1" />
 
+    <!--When manual confirmation is required-->
     <ImageView
             android:id="@+id/imageView"
             android:layout_width="0dp"

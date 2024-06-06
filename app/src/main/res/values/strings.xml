@@ -16,4 +16,6 @@
     <string name="face_too_far">Face muito distante</string>
     <string name="face_too_close">Face muito próxima</string>
     <string name="face_invalid_angles">Não foi possível verficar a face!</string>
+    <!-- TODO: Remove or change this placeholder text -->
+    <string name="hello_blank_fragment">Hello blank fragment</string>
 </resources>

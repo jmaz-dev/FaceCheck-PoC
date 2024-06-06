@@ -21,6 +21,7 @@ import androidx.lifecycle.Observer
 import androidx.lifecycle.ViewModelProvider
 import com.example.facecheckpoc.data.UserModel
 import com.example.facecheckpoc.databinding.ActivityMainBinding
+import com.example.facecheckpoc.verification.Verification2Fragment
 import org.opencv.android.CameraBridgeViewBase
 import org.opencv.android.CameraBridgeViewBase.CvCameraViewListener2
 import org.opencv.android.JavaCameraView
@@ -52,11 +53,21 @@ class MainActivity : AppCompatActivity() {
         enableEdgeToEdge()
         setContentView(binding.root)
 
-        binding.buttonCapture.setOnClickListener {
-            
+        binding.verificationButton.setOnClickListener {
+            navigateToVerificationFragment()
         }
 
 
+    }
+
+    private fun navigateToVerificationFragment() {
+        // Crie uma instância da Verification2Fragment
+        val verificationFragment = Verification2Fragment()
+
+        // Adicione a fragment ao gerenciador de fragments
+        supportFragmentManager.beginTransaction()
+            .add(R.id.fragment_container, verificationFragment)
+            .commit()
     }
 
 }
