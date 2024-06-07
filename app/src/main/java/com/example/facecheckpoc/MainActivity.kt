@@ -53,7 +53,7 @@ class MainActivity : AppCompatActivity() {
         enableEdgeToEdge()
         setContentView(binding.root)
 
-        binding.verificationButton.setOnClickListener {
+        binding.buttonVerify.setOnClickListener {
             navigateToVerificationFragment()
         }
 

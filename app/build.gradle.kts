@@ -8,6 +8,21 @@ android {
     namespace = "com.example.facecheckpoc"
     compileSdk = 34
 
+    sourceSets {
+        getByName("main") {
+            // This is where your Java source files reside
+            java.srcDirs("src/main/java", "src/main/kotlin")
+        }
+    }
+
+    // Configure the location for jniLibs
+    externalNativeBuild {
+        cmake {
+            path = file("src/main/cpp/CMakeLists.txt")
+            version = "3.22.1"
+        }
+    }
+
     defaultConfig {
         applicationId = "com.example.facecheckpoc"
         minSdk = 26
@@ -37,6 +52,8 @@ android {
     buildFeatures {
         viewBinding = true
     }
+    ndkVersion = "26.1.10909125"
+
 }
 configurations.all {
     exclude(group = "com.intellij", module = "annotations")
@@ -71,9 +88,6 @@ dependencies {
     implementation("org.tensorflow:tensorflow-lite:2.15.0")
     implementation("org.tensorflow:tensorflow-lite-gpu:2.15.0")
     implementation("org.tensorflow:tensorflow-lite-support:0.1.0")
-
-
-
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
