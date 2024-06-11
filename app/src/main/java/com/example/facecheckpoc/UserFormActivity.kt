@@ -22,13 +22,14 @@ import androidx.lifecycle.ViewModelProvider
 import com.example.facecheckpoc.data.UserModel
 import com.example.facecheckpoc.databinding.ActivityFormUserBinding
 import java.io.ByteArrayOutputStream
+import java.nio.ByteBuffer
 
 class UserFormActivity() : AppCompatActivity(), View.OnClickListener {
 
     private lateinit var binding: ActivityFormUserBinding
     private lateinit var viewModel: UserViewModel
     private lateinit var takePictureLauncher: ActivityResultLauncher<Void?>
-    private var encodedImage: String = ""
+    private var encodedImage: ByteArray? = null
 
     companion object {
         private const val REQUEST_CAMERA_PERMISSION = 1
@@ -126,11 +127,12 @@ class UserFormActivity() : AppCompatActivity(), View.OnClickListener {
                     val byteArray = byteArrayOutputStream.toByteArray()
 
                     // Converta o array de bytes para uma string Base64
-                    encodedImage = Base64.encodeToString(byteArray, Base64.DEFAULT)
+                    encodedImage = byteArray
+
 
                     // Exiba a imagem no ImageView
                     binding.imageCapture.setImageBitmap(bitmapToUse)
-                    binding.imageCapture.background= getDrawable(R.drawable.rounded_corners)
+                    binding.imageCapture.background = getDrawable(R.drawable.rounded_corners)
 
                     IS_PICTURE_TAKED = 1
                 } else {
@@ -165,7 +167,7 @@ class UserFormActivity() : AppCompatActivity(), View.OnClickListener {
             val user = UserModel()
             user.name = name
             user.cpf = cpf
-            user.face = encodedImage
+            user.face = encodedImage!!
             viewModel.submitUser(user)
 
         } else {
@@ -180,6 +182,7 @@ class UserFormActivity() : AppCompatActivity(), View.OnClickListener {
                 binding.editName.setText("")
                 binding.editCpf.setText("")
                 binding.imageCapture.setImageResource(R.drawable.ic_person)
+                binding.imageCapture.setBackgroundResource(R.drawable.rounded_icon)
                 IS_PICTURE_TAKED = 0
             } else {
                 useToast("Ocorreu um erro ao tentar cadastrar")

@@ -6,6 +6,7 @@
         android:layout_height="match_parent"
         android:padding="24dp"
         android:orientation="vertical"
+        android:background="@color/md_theme_background"
         tools:context=".verification.Verification2Fragment">
 
     <TextView
@@ -47,7 +48,7 @@
 
     <com.google.android.material.textview.MaterialTextView
             style="@style/TextAppearance.MaterialComponents.Body1"
-            android:id="@+id/infoText"
+            android:id="@+id/text_info"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_marginTop="24dp"
@@ -65,7 +66,7 @@
             android:layout_marginTop="16dp"
             android:text="@string/btn_cancel"
             app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintTop_toBottomOf="@id/infoText" />
+            app:layout_constraintTop_toBottomOf="@id/text_info" />
 
 
 </androidx.constraintlayout.widget.ConstraintLayout>

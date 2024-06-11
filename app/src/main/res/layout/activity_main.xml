@@ -4,24 +4,32 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent">
 
-    <com.google.android.material.textfield.TextInputEditText
-            style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
-            android:id="@+id/edit_cpf"
+
+    <com.google.android.material.textfield.TextInputLayout
+            android:id="@+id/input_cpf"
             android:layout_width="0dp"
             app:layout_constraintVertical_chainStyle="packed"
             android:layout_marginBottom="34dp"
             android:layout_marginHorizontal="64dp"
             android:layout_height="wrap_content"
             android:hint="CPF"
+            app:errorEnabled="true"
             app:layout_constraintBottom_toTopOf="@id/button_verify"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toTopOf="parent">
 
-    </com.google.android.material.textfield.TextInputEditText>
+        <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/edit_cpf"
+                android:layout_width="match_parent"
+                android:maxLength="11"
+                android:inputType="number"
+                android:layout_height="wrap_content" />
+
+    </com.google.android.material.textfield.TextInputLayout>
 
     <com.google.android.material.button.MaterialButton
-            style="@style/Widget.Material3.Button.OutlinedButton"
+            style="@style/Widget.Material3.Button"
             android:id="@+id/button_verify"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
@@ -29,7 +37,7 @@
             app:layout_constraintBottom_toBottomOf="parent"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toBottomOf="@id/edit_cpf" />
+            app:layout_constraintTop_toBottomOf="@id/input_cpf" />
 
     <FrameLayout
             android:id="@+id/fragment_container"

@@ -1,47 +1,23 @@
 package com.example.facecheckpoc
 
-import android.Manifest
 import android.content.Context
-import android.content.pm.PackageManager
-import android.hardware.camera2.CameraAccessException
-import android.hardware.camera2.CameraCaptureSession
-import android.hardware.camera2.CameraCharacteristics
-import android.hardware.camera2.CameraDevice
-import android.hardware.camera2.CameraManager
 import android.os.Bundle
-import android.os.Handler
-import android.os.Looper
-import android.util.Log
-import android.view.MenuItem
-import android.view.SurfaceView
+import android.view.View
+import android.view.inputmethod.InputMethodManager
 import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
-import androidx.core.app.ActivityCompat
 import androidx.lifecycle.Observer
 import androidx.lifecycle.ViewModelProvider
-import com.example.facecheckpoc.data.UserModel
 import com.example.facecheckpoc.databinding.ActivityMainBinding
 import com.example.facecheckpoc.verification.Verification2Fragment
-import org.opencv.android.CameraBridgeViewBase
-import org.opencv.android.CameraBridgeViewBase.CvCameraViewListener2
-import org.opencv.android.JavaCameraView
-import org.opencv.android.OpenCVLoader
-import org.opencv.core.CvType
-import org.opencv.core.Mat
-import org.opencv.core.MatOfRect
-import org.opencv.core.Point
-import org.opencv.core.Rect
-import org.opencv.core.Scalar
-import org.opencv.imgproc.Imgproc
-import org.opencv.objdetect.CascadeClassifier
-import java.io.File
-import java.io.FileOutputStream
 
 
 class MainActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityMainBinding
     private lateinit var viewModel: UserViewModel
+    private var userFace: ByteArray? = null
+    private lateinit var verification2Fragment: Verification2Fragment
 
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -54,22 +30,58 @@ class MainActivity : AppCompatActivity() {
         setContentView(binding.root)
 
         binding.buttonVerify.setOnClickListener {
-            navigateToVerificationFragment()
+            cpfVerifcation()
         }
 
-
+        observe()
     }
 
-    private fun navigateToVerificationFragment() {
-        // Crie uma instância da Verification2Fragment
-        val verificationFragment = Verification2Fragment()
+    private fun navigate() {
+
+        // Atribui a instância da Verification2Fragment
+        verification2Fragment = Verification2Fragment().apply {
+            arguments = Bundle().apply {
+                putByteArray("face", userFace)
+            }
+        }
 
         // Adicione a fragment ao gerenciador de fragments
         supportFragmentManager.beginTransaction()
-            .add(R.id.fragment_container, verificationFragment)
+            .add(R.id.fragment_container, verification2Fragment)
             .commit()
     }
 
+
+    private fun cpfVerifcation() {
+        viewModel.getUserByCpf(binding.editCpf.text.toString())
+        val inputCpf = binding.inputCpf
+        if (binding.editCpf.text.isNullOrBlank()) {
+            inputCpf.error = "Campo obrigatório"
+            return
+        } else if (userFace == null) {
+            inputCpf.error = "Usuário não identificado"
+            return
+        } else {
+            inputCpf.error = null
+            fecharTeclado()
+            navigate()
+
+        }
+    }
+
+    private fun observe() {
+        viewModel.userModel.observe(this, Observer {
+            if (it != null) {
+                userFace = it.face
+
+            }
+        })
+    }
+
+    fun fecharTeclado() {
+        val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
+        imm.hideSoftInputFromWindow(currentFocus?.windowToken ?: View(this).windowToken, 0)
+    }
 }
 
 

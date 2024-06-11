@@ -28,5 +28,8 @@ class UserViewModel(application: Application) : AndroidViewModel(application) {
     fun submitUser(user: UserModel) {
         _userSubmit.value = userRepository.insert(user)
     }
-    
+
 }
+//    fun getFace(): ByteArray {
+//        return userModel.value?.face ?: ByteArray(0)
+//    }
