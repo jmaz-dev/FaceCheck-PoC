@@ -46,6 +46,17 @@
             app:lottie_autoPlay="true"
             app:lottie_loop="true" />
 
+    <ImageView
+            android:id="@+id/imageView"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:scaleType="centerCrop"
+            app:layout_constraintStart_toStartOf="@id/camera_preview"
+            app:layout_constraintEnd_toEndOf="@id/camera_preview"
+            app:layout_constraintTop_toTopOf="@id/camera_preview"
+            app:layout_constraintBottom_toBottomOf="@id/camera_preview"
+            android:visibility="gone" />
+
     <com.google.android.material.textview.MaterialTextView
             style="@style/TextAppearance.MaterialComponents.Body1"
             android:id="@+id/text_info"
@@ -67,6 +78,17 @@
             android:text="@string/btn_cancel"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintTop_toBottomOf="@id/text_info" />
+
+    <Button
+            style="@style/Widget.MaterialComponents.Button.TextButton"
+            android:id="@+id/cancelButtonView"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:text="@string/btn_cancel"
+            app:layout_constraintEnd_toEndOf="parent"
+            android:visibility="gone"
+            app:layout_constraintTop_toBottomOf="@id/imageView" />
 
 
 </androidx.constraintlayout.widget.ConstraintLayout>

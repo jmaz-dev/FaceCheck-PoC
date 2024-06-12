@@ -8,6 +8,7 @@ import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.Observer
 import androidx.lifecycle.ViewModelProvider
+import com.example.facecheckpoc.data.UserModel
 import com.example.facecheckpoc.databinding.ActivityMainBinding
 import com.example.facecheckpoc.verification.Verification2Fragment
 
@@ -16,7 +17,7 @@ class MainActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityMainBinding
     private lateinit var viewModel: UserViewModel
-    private var userFace: ByteArray? = null
+    private var user: UserModel? = null
     private lateinit var verification2Fragment: Verification2Fragment
 
 
@@ -41,7 +42,8 @@ class MainActivity : AppCompatActivity() {
         // Atribui a instância da Verification2Fragment
         verification2Fragment = Verification2Fragment().apply {
             arguments = Bundle().apply {
-                putByteArray("face", userFace)
+                putString("name", user!!.name)
+                putByteArray("face", user!!.face)
             }
         }
 
@@ -58,7 +60,7 @@ class MainActivity : AppCompatActivity() {
         if (binding.editCpf.text.isNullOrBlank()) {
             inputCpf.error = "Campo obrigatório"
             return
-        } else if (userFace == null) {
+        } else if (user == null) {
             inputCpf.error = "Usuário não identificado"
             return
         } else {
@@ -72,7 +74,7 @@ class MainActivity : AppCompatActivity() {
     private fun observe() {
         viewModel.userModel.observe(this, Observer {
             if (it != null) {
-                userFace = it.face
+                user = it
 
             }
         })
