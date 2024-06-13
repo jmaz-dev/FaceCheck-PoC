@@ -8,7 +8,6 @@ import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import android.view.animation.Animation
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.OptIn
@@ -44,6 +43,7 @@ class Verification2Fragment : DialogFragment() {
     private lateinit var faceDetector: FaceDetector
     private lateinit var interpreter: Interpreter
     private var detectFaceJob: Job? = null
+    private var successDetectJob: Job? = null
     private lateinit var animationView: LottieAnimationView
 
 
@@ -106,12 +106,7 @@ class Verification2Fragment : DialogFragment() {
     override fun onDestroyView() {
         super.onDestroyView()
         detectFaceJob?.cancel()
-    }
-
-    override fun onStop() {
-        super.onStop()
-        detectFaceJob?.cancel()
-
+        cameraProvider.unbindAll()
     }
 
     private fun loadModelFile(modelPath: String): MappedByteBuffer {
@@ -127,6 +122,7 @@ class Verification2Fragment : DialogFragment() {
 
 
     private fun startCamera() {
+        startFaceDetectionTimeout()
         val cameraProviderFuture = ProcessCameraProvider.getInstance(requireContext())
         cameraProviderFuture.addListener({
             cameraProvider = cameraProviderFuture.get()
@@ -204,11 +200,11 @@ class Verification2Fragment : DialogFragment() {
                                 processImageWithTFLite(userFace, cameraEmbedding)
                             } else {
                                 binding.textInfo.text = getString(R.string.face_not_centered)
-                                startFaceDetectionTimeout()
+
                             }
                         } else {
                             binding.textInfo.text = getString(R.string.face_invalid_angles)
-                            startFaceDetectionTimeout()
+
                         }
                         imageProxy.close()
                     }
@@ -234,13 +230,12 @@ class Verification2Fragment : DialogFragment() {
                 if (storedOutputBuffer.isNotEmpty() && cameraOutputBuffer.isNotEmpty()) {
                     val distance =
                         calculateEuclideanDistance(storedOutputBuffer, cameraOutputBuffer)
+                    Log.d(TAG, "Distance: $distance")
                     if (distance < THRESHOLD) {
                         detectFaceJob?.cancel()
-                        binding.textInfo.text = "Rostos correspondem"
                         detectAndDrawBoundingBox(preprocessedCameraBitmap, userName)
                     } else {
-                        unsetImageView()
-                        startFaceDetectionTimeout()
+//                      unsetImageView()
                         binding.textInfo.text = "Rostos não correspondem"
                     }
                 } else {
@@ -276,9 +271,12 @@ class Verification2Fragment : DialogFragment() {
             .addOnSuccessListener { faces ->
                 val face = faces.first()
                 val outputBitmap = drawBoundingBoxAndLabel(bitmap, face, label)
+                cameraProvider.unbindAll()
+                binding.textInfo.text = "Rostos correspondem"
                 binding.cameraPreview.visibility = View.INVISIBLE
                 binding.animation.visibility = View.GONE
                 binding.imageView.visibility = View.VISIBLE
+                binding.cancelButton.isEnabled = true
                 binding.imageView.setImageBitmap(outputBitmap)
             }
     }
@@ -383,6 +381,6 @@ class Verification2Fragment : DialogFragment() {
         private const val IMAGE_MEAN = 128.0f
         private const val IMAGE_STD = 128.0f
         private const val OUTPUT_SIZE = 192
-        private const val THRESHOLD = 0.65f
+        private const val THRESHOLD = 0.78f
     }
 }

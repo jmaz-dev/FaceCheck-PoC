@@ -123,7 +123,7 @@ class UserFormActivity() : AppCompatActivity(), View.OnClickListener {
 
                     // Converta o bitmap para um array de bytes
                     val byteArrayOutputStream = ByteArrayOutputStream()
-                    bitmap.compress(Bitmap.CompressFormat.PNG, 100, byteArrayOutputStream)
+                    bitmap.compress(Bitmap.CompressFormat.JPEG, 100, byteArrayOutputStream)
                     val byteArray = byteArrayOutputStream.toByteArray()
 
                     // Converta o array de bytes para uma string Base64
