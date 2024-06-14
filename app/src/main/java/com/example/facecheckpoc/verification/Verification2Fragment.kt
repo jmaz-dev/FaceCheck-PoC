@@ -109,6 +109,14 @@ class Verification2Fragment : DialogFragment() {
         cameraProvider.unbindAll()
     }
 
+    private fun configureFaceDetector() {
+        val options = FaceDetectorOptions.Builder()
+            .setPerformanceMode(FaceDetectorOptions.PERFORMANCE_MODE_ACCURATE)
+            .setContourMode(FaceDetectorOptions.CONTOUR_MODE_ALL)
+            .build()
+        faceDetector = FaceDetection.getClient(options)
+    }
+
     private fun loadModelFile(modelPath: String): MappedByteBuffer {
         val assetFileDescriptor = requireContext().assets.openFd(modelPath)
         val fileInputStream = FileInputStream(assetFileDescriptor.fileDescriptor)
@@ -128,37 +136,6 @@ class Verification2Fragment : DialogFragment() {
             cameraProvider = cameraProviderFuture.get()
             bindCameraUseCases()
         }, ContextCompat.getMainExecutor(requireContext()))
-    }
-
-    @OptIn(ExperimentalGetImage::class)
-    private fun bindCameraUseCases() {
-        val preview = Preview.Builder().build()
-        val imageCapture = ImageCapture.Builder().build()
-        val imageAnalyzer = ImageAnalysis.Builder()
-            .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
-            .build()
-            .also {
-                it.setAnalyzer(ContextCompat.getMainExecutor(requireContext()), ::processImageProxy)
-            }
-
-        val cameraSelector = CameraSelector.DEFAULT_FRONT_CAMERA
-        cameraProvider.unbindAll()
-        camera = cameraProvider.bindToLifecycle(
-            this,
-            cameraSelector,
-            preview,
-            imageCapture,
-            imageAnalyzer
-        )
-        preview.setSurfaceProvider(binding.cameraPreview.surfaceProvider)
-    }
-
-    private fun configureFaceDetector() {
-        val options = FaceDetectorOptions.Builder()
-            .setPerformanceMode(FaceDetectorOptions.PERFORMANCE_MODE_ACCURATE)
-            .setContourMode(FaceDetectorOptions.CONTOUR_MODE_ALL)
-            .build()
-        faceDetector = FaceDetection.getClient(options)
     }
 
     private fun startFaceDetectionTimeout() {
@@ -184,6 +161,30 @@ class Verification2Fragment : DialogFragment() {
     }
 
     @OptIn(ExperimentalGetImage::class)
+    private fun bindCameraUseCases() {
+        val preview = Preview.Builder().build()
+        val imageCapture = ImageCapture.Builder().build()
+        val imageAnalyzer = ImageAnalysis.Builder()
+            .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
+            .build()
+            .also {
+                it.setAnalyzer(ContextCompat.getMainExecutor(requireContext()), ::processImageProxy)
+            }
+
+        val cameraSelector = CameraSelector.DEFAULT_FRONT_CAMERA
+        cameraProvider.unbindAll()
+        camera = cameraProvider.bindToLifecycle(
+            this,
+            cameraSelector,
+            preview,
+            imageCapture,
+            imageAnalyzer
+        )
+        preview.setSurfaceProvider(binding.cameraPreview.surfaceProvider)
+    }
+
+
+    @OptIn(ExperimentalGetImage::class)
     private fun processImageProxy(imageProxy: ImageProxy) {
         lifecycleScope.launch(Dispatchers.IO) {
             val rotationDegrees = imageProxy.imageInfo.rotationDegrees
@@ -195,9 +196,16 @@ class Verification2Fragment : DialogFragment() {
                         if (faces.isNotEmpty()) {
                             binding.textInfo.text = getString(R.string.detecting_face)
 
+                            // Transform cameraEmbeding to bitmap and preprocess the bitmap
                             val cameraEmbedding = imageProxyToBitmap(imageProxy)
+
+                            // Transform storedEmbeding to bitmap and preprocess the bitmap
+                            val storedBitmap =
+                                BitmapFactory.decodeByteArray(userFace, 0, userFace.size)
+                            val storedEmbedding = preprocessImage(storedBitmap)
+
                             if (cameraEmbedding != null) {
-                                processImageWithTFLite(userFace, cameraEmbedding)
+                                processImageWithTFLite(storedEmbedding, cameraEmbedding)
                             } else {
                                 binding.textInfo.text = getString(R.string.face_not_centered)
 
@@ -215,82 +223,6 @@ class Verification2Fragment : DialogFragment() {
                     imageProxy.close()
                 }
         }
-    }
-
-    private fun processImageWithTFLite(storedImage: ByteArray?, cameraEmbedding: Bitmap) {
-        if (storedImage != null) {
-            val storedBitmap = BitmapFactory.decodeByteArray(storedImage, 0, storedImage.size)
-            storedBitmap?.let {
-                val preprocessedStoredBitmap = preprocessImage(it)
-                val preprocessedCameraBitmap = preprocessImage(cameraEmbedding)
-
-                val storedOutputBuffer = runModel(preprocessedStoredBitmap)
-                val cameraOutputBuffer = runModel(preprocessedCameraBitmap)
-
-                if (storedOutputBuffer.isNotEmpty() && cameraOutputBuffer.isNotEmpty()) {
-                    val distance =
-                        calculateEuclideanDistance(storedOutputBuffer, cameraOutputBuffer)
-                    Log.d(TAG, "Distance: $distance")
-                    if (distance < THRESHOLD) {
-                        detectFaceJob?.cancel()
-                        detectAndDrawBoundingBox(preprocessedCameraBitmap, userName)
-                    } else {
-//                      unsetImageView()
-                        binding.textInfo.text = "Rostos não correspondem"
-                    }
-                } else {
-                    Log.e(TAG, "Erro de tamanho de embedding")
-                    binding.textInfo.text = "Erro de tamanho de embedding"
-                }
-            } ?: run {
-                Log.d(TAG, "Falha na conversão do ByteArray para Bitmap")
-                binding.textInfo.text = "Falha na conversão da imagem"
-            }
-        } else {
-            Log.d(TAG, "ByteArray do rosto é nulo")
-            binding.textInfo.text = "ByteArray do rosto é nulo"
-        }
-    }
-
-    private fun unsetImageView() {
-        binding.cameraPreview.visibility = View.VISIBLE
-        binding.animation.visibility = View.VISIBLE
-        binding.imageView.visibility = View.GONE
-    }
-
-    private fun runModel(bitmap: Bitmap): FloatArray {
-        val inputBuffer = convertBitmapToByteBuffer(bitmap)
-        val outputBuffer = Array(1) { FloatArray(OUTPUT_SIZE) }
-        interpreter.run(inputBuffer, outputBuffer)
-        return outputBuffer[0]
-    }
-
-    private fun detectAndDrawBoundingBox(bitmap: Bitmap, label: String) {
-        val inputImage = InputImage.fromBitmap(bitmap, 0)
-        faceDetector.process(inputImage)
-            .addOnSuccessListener { faces ->
-                val face = faces.first()
-                val outputBitmap = drawBoundingBoxAndLabel(bitmap, face, label)
-                cameraProvider.unbindAll()
-                binding.textInfo.text = "Rostos correspondem"
-                binding.cameraPreview.visibility = View.INVISIBLE
-                binding.animation.visibility = View.GONE
-                binding.imageView.visibility = View.VISIBLE
-                binding.cancelButton.isEnabled = true
-                binding.imageView.setImageBitmap(outputBitmap)
-            }
-    }
-
-    // Manipulate image color
-    private fun preprocessImage(bitmap: Bitmap): Bitmap {
-        val resizedBitmap = Bitmap.createScaledBitmap(bitmap, INPUT_SIZE, INPUT_SIZE, false)
-        val grayBitmap = Bitmap.createBitmap(INPUT_SIZE, INPUT_SIZE, Bitmap.Config.ARGB_8888)
-        val canvas = Canvas(grayBitmap)
-        val paint = Paint().apply {
-            colorFilter = ColorMatrixColorFilter(ColorMatrix().apply { setSaturation(0f) })
-        }
-        canvas.drawBitmap(resizedBitmap, 0f, 0f, paint)
-        return grayBitmap
     }
 
     @OptIn(ExperimentalGetImage::class)
@@ -330,6 +262,61 @@ class Verification2Fragment : DialogFragment() {
         )
     }
 
+    // Resize and convert the image to grayscale
+    private fun preprocessImage(bitmap: Bitmap): Bitmap {
+        val resizedBitmap = Bitmap.createScaledBitmap(bitmap, INPUT_SIZE, INPUT_SIZE, false)
+        val grayBitmap = Bitmap.createBitmap(INPUT_SIZE, INPUT_SIZE, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(grayBitmap)
+        val paint = Paint().apply {
+            colorFilter = ColorMatrixColorFilter(ColorMatrix().apply { setSaturation(0f) })
+        }
+        canvas.drawBitmap(resizedBitmap, 0f, 0f, paint)
+        return grayBitmap
+    }
+
+    private fun processImageWithTFLite(storedImage: Bitmap?, cameraEmbedding: Bitmap) {
+        if (storedImage != null) {
+            val preprocessedStoredBitmap = storedImage
+            val preprocessedCameraBitmap = cameraEmbedding
+
+            val storedOutputBuffer = runModel(preprocessedStoredBitmap)
+            val cameraOutputBuffer = runModel(preprocessedCameraBitmap)
+
+            if (storedOutputBuffer.isNotEmpty() && cameraOutputBuffer.isNotEmpty()) {
+                val distance =
+                    calculateEuclideanDistance(storedOutputBuffer, cameraOutputBuffer)
+                Log.d(TAG, "Distance: $distance")
+                if (distance < THRESHOLD) {
+                    detectFaceJob?.cancel()
+                    detectAndDrawBoundingBox(preprocessedCameraBitmap, userName)
+                } else {
+//                      unsetImageView()
+                    binding.textInfo.text = "Rostos não correspondem"
+                }
+            } else {
+                Log.e(TAG, "Erro de tamanho de embedding")
+                binding.textInfo.text = "Erro de tamanho de embedding"
+            }
+        } else {
+            Log.d(TAG, "ByteArray do rosto é nulo")
+            binding.textInfo.text = "ByteArray do rosto é nulo"
+        }
+    }
+
+
+    private fun unsetImageView() {
+        binding.cameraPreview.visibility = View.VISIBLE
+        binding.animation.visibility = View.VISIBLE
+        binding.imageView.visibility = View.GONE
+    }
+
+    private fun runModel(bitmap: Bitmap): FloatArray {
+        val inputBuffer = convertBitmapToByteBuffer(bitmap)
+        val outputBuffer = Array(1) { FloatArray(OUTPUT_SIZE) }
+        interpreter.run(inputBuffer, outputBuffer)
+        return outputBuffer[0]
+    }
+
     private fun convertBitmapToByteBuffer(bitmap: Bitmap): ByteBuffer {
         val byteBuffer = ByteBuffer.allocateDirect(4 * INPUT_SIZE * INPUT_SIZE * 3)
         byteBuffer.order(ByteOrder.nativeOrder())
@@ -342,6 +329,31 @@ class Verification2Fragment : DialogFragment() {
         }
         return byteBuffer
     }
+
+    private fun detectAndDrawBoundingBox(bitmap: Bitmap, label: String) {
+        val inputImage = InputImage.fromBitmap(bitmap, 0)
+        faceDetector.process(inputImage)
+            .addOnSuccessListener { faces ->
+                if (faces.isEmpty()) {
+                    binding.textInfo.text = "Não foi possível detectar o rosto"
+                    return@addOnSuccessListener
+                }
+                val face = faces.first()
+                val outputBitmap = drawBoundingBoxAndLabel(bitmap, face, label)
+                cameraProvider.unbindAll()
+                binding.textInfo.text = "Rostos correspondem"
+                binding.cameraPreview.visibility = View.INVISIBLE
+                binding.animation.visibility = View.GONE
+                binding.imageView.visibility = View.VISIBLE
+                binding.cancelButton.isEnabled = true
+                binding.imageView.setImageBitmap(outputBitmap)
+            }
+            .addOnFailureListener { e ->
+                Log.e(TAG, "Falha na detecção de rosto", e)
+                binding.textInfo.text = "Falha na detecção de rosto"
+            }
+    }
+
 
     private fun calculateEuclideanDistance(embedding1: FloatArray, embedding2: FloatArray): Float {
         return sqrt(embedding1.indices.sumOf {

@@ -51,6 +51,7 @@ class UserFormActivity() : AppCompatActivity(), View.OnClickListener {
 
         binding.buttonSubmit.setOnClickListener(this)
         binding.imageCapture.setOnClickListener(this)
+        binding.imagePreview.setOnClickListener(this)
 
         pictureLauncher()
 
@@ -82,6 +83,10 @@ class UserFormActivity() : AppCompatActivity(), View.OnClickListener {
             R.id.image_capture -> {
                 handleImageCapture()
             }
+
+            R.id.image_preview -> {
+                handleImageCapture()
+            }
         }
     }
 
@@ -106,20 +111,11 @@ class UserFormActivity() : AppCompatActivity(), View.OnClickListener {
         takePictureLauncher =
             registerForActivityResult(ActivityResultContracts.TakePicturePreview()) { bitmap ->
                 if (bitmap != null) {
-                    val displayMetrics = resources.displayMetrics
-                    val screenWidthDp = displayMetrics.widthPixels / displayMetrics.density
-                    // Verifica se a tela é de um celular (considerando telas menores que 600dp como celulares)
-                    val isCelular = screenWidthDp < 600
-
-                    val bitmapToUse = if (isCelular) {
-                        // Redimensiona a imagem para celulares
-                        val newWidth = (screenWidthDp * 0.8).toInt() // 80% da largura da tela
-                        val newHeight = (bitmap.height * newWidth) / bitmap.width
-                        Bitmap.createScaledBitmap(bitmap, newWidth, newHeight, true)
-                    } else {
-                        // Mantém a imagem original para tablets
-                        bitmap
-                    }
+                    // Exibir a imagem no ImageView
+                    binding.imagePreview.visibility = View.VISIBLE
+                    binding.imageCapture.visibility = View.INVISIBLE
+                    binding.imagePreview.setImageBitmap(bitmap)
+                    IS_PICTURE_TAKED = 1
 
                     // Converta o bitmap para um array de bytes
                     val byteArrayOutputStream = ByteArrayOutputStream()
@@ -130,11 +126,6 @@ class UserFormActivity() : AppCompatActivity(), View.OnClickListener {
                     encodedImage = byteArray
 
 
-                    // Exiba a imagem no ImageView
-                    binding.imageCapture.setImageBitmap(bitmapToUse)
-                    binding.imageCapture.background = getDrawable(R.drawable.rounded_corners)
-
-                    IS_PICTURE_TAKED = 1
                 } else {
                     Log.d(TAG, "Bitmap is null")
                     useToast("Failed to capture image")
@@ -181,6 +172,9 @@ class UserFormActivity() : AppCompatActivity(), View.OnClickListener {
                 useToast("Usuário cadastrado com sucesso")
                 binding.editName.setText("")
                 binding.editCpf.setText("")
+                binding.imagePreview.visibility = View.INVISIBLE
+                binding.imagePreview.setImageBitmap(null)
+                binding.imageCapture.visibility = View.VISIBLE
                 binding.imageCapture.setImageResource(R.drawable.ic_person)
                 binding.imageCapture.setBackgroundResource(R.drawable.rounded_icon)
                 IS_PICTURE_TAKED = 0
