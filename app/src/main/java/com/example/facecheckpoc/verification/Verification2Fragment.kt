@@ -2,6 +2,7 @@ package com.example.facecheckpoc.verification
 
 import android.Manifest
 import android.content.pm.PackageManager
+import android.content.res.Resources
 import android.graphics.*
 import android.os.Bundle
 import android.util.Log
@@ -21,30 +22,40 @@ import androidx.lifecycle.lifecycleScope
 import com.airbnb.lottie.LottieAnimationView
 import com.example.facecheckpoc.R
 import com.example.facecheckpoc.databinding.FragmentVerification2Binding
+import com.example.facecheckpoc.utils.rotateBitmap
+import com.example.facecheckpoc.utils.setWidthPercent
+import com.example.facecheckpoc.utils.toBitmap
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.face.Face
 import com.google.mlkit.vision.face.FaceDetection
 import com.google.mlkit.vision.face.FaceDetector
 import com.google.mlkit.vision.face.FaceDetectorOptions
 import kotlinx.coroutines.*
+import org.tensorflow.lite.DataType
 import org.tensorflow.lite.Interpreter
+import org.tensorflow.lite.support.common.ops.NormalizeOp
+import org.tensorflow.lite.support.image.ImageProcessor
+import org.tensorflow.lite.support.image.TensorImage
 import java.io.*
 import java.nio.*
 import java.nio.channels.FileChannel
+import kotlin.math.abs
 import kotlin.math.pow
 import kotlin.math.sqrt
 
+@ExperimentalGetImage
 class Verification2Fragment : DialogFragment() {
     private lateinit var binding: FragmentVerification2Binding
     private lateinit var userFace: ByteArray
+    private lateinit var storedEmbedding: FloatArray
     private lateinit var userName: String
     private lateinit var cameraProvider: ProcessCameraProvider
     private lateinit var camera: Camera
     private lateinit var faceDetector: FaceDetector
     private lateinit var interpreter: Interpreter
-    private var detectFaceJob: Job? = null
-    private var successDetectJob: Job? = null
     private lateinit var animationView: LottieAnimationView
+    private val maxVerificationTimems: Long = 10000
+    private var startTimeMs: Long = 0
 
 
     private val getPermissionResult = registerForActivityResult(
@@ -62,6 +73,8 @@ class Verification2Fragment : DialogFragment() {
         }
     }
 
+    override fun getTheme() = R.style.Verification_Dialog
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         arguments?.let {
@@ -75,9 +88,14 @@ class Verification2Fragment : DialogFragment() {
         container: ViewGroup?,
         savedInstanceState: Bundle?
     ): View {
-        binding = FragmentVerification2Binding.inflate(inflater, container, false)
+        binding = FragmentVerification2Binding.inflate(LayoutInflater.from(context))
         binding.cancelButton.setOnClickListener { dismiss() }
         binding.cancelButtonView.setOnClickListener { dismiss() }
+
+        configureFaceDetector()
+
+        interpreter = Interpreter(loadModelFile("mobile_face_net.tflite"))
+
         return binding.root
     }
 
@@ -98,16 +116,45 @@ class Verification2Fragment : DialogFragment() {
         } else {
             getPermissionResult.launch(Manifest.permission.CAMERA)
         }
+        // Transform storedEmbeding to bitmap and preprocess the bitmap
+        storedEmbedding = generateCompareEmbedding()
 
-        configureFaceDetector()
-        interpreter = Interpreter(loadModelFile("mobile_face_net.tflite"))
     }
 
     override fun onDestroyView() {
         super.onDestroyView()
-        detectFaceJob?.cancel()
+        faceDetector.close()
+        faceDetector.close()
         cameraProvider.unbindAll()
     }
+
+    override fun onResume() {
+        super.onResume()
+
+        val dm = Resources.getSystem().displayMetrics
+        val widthDp = dm.widthPixels / dm.density
+        if (dm.heightPixels > dm.widthPixels && widthDp < 500) {
+            setWidthPercent(95)
+        } else if (dm.heightPixels > dm.widthPixels) {
+            setWidthPercent(85)
+        } else {
+            setWidthPercent(40)
+        }
+    }
+
+    private fun generateCompareEmbedding(): FloatArray {
+        if (userFace.isNotEmpty()) {
+            val storedBitmap = BitmapFactory.decodeByteArray(userFace, 0, userFace.size)
+            val preProcessStored = preprocessImage(storedBitmap)
+            val embedding = runModel(preProcessStored)
+
+            return embedding
+        } else {
+            Log.e(TAG, "Erro de tamanho de embedding")
+            return floatArrayOf()
+        }
+    }
+
 
     private fun configureFaceDetector() {
         val options = FaceDetectorOptions.Builder()
@@ -128,26 +175,15 @@ class Verification2Fragment : DialogFragment() {
         )
     }
 
-
     private fun startCamera() {
-        startFaceDetectionTimeout()
+        startTimeMs = System.currentTimeMillis()
+        binding.textInfo.text = getString(R.string.detecting_face)
+
         val cameraProviderFuture = ProcessCameraProvider.getInstance(requireContext())
         cameraProviderFuture.addListener({
             cameraProvider = cameraProviderFuture.get()
             bindCameraUseCases()
         }, ContextCompat.getMainExecutor(requireContext()))
-    }
-
-    private fun startFaceDetectionTimeout() {
-        detectFaceJob?.cancel()
-        detectFaceJob = lifecycleScope.launch {
-            delay(10000)
-            if (isAdded) {
-                binding.textInfo.text = "Não foi possível detectar o rosto"
-                Log.d("FaceDetectionTimeout", "Timeout reached")
-                stopCameraPreview()
-            }
-        }
     }
 
     private fun stopCameraPreview() {
@@ -160,7 +196,6 @@ class Verification2Fragment : DialogFragment() {
         animationView.playAnimation()
     }
 
-    @OptIn(ExperimentalGetImage::class)
     private fun bindCameraUseCases() {
         val preview = Preview.Builder().build()
         val imageCapture = ImageCapture.Builder().build()
@@ -184,7 +219,6 @@ class Verification2Fragment : DialogFragment() {
     }
 
 
-    @OptIn(ExperimentalGetImage::class)
     private fun processImageProxy(imageProxy: ImageProxy) {
         lifecycleScope.launch(Dispatchers.IO) {
             val rotationDegrees = imageProxy.imageInfo.rotationDegrees
@@ -193,27 +227,68 @@ class Verification2Fragment : DialogFragment() {
             faceDetector.process(inputImage)
                 .addOnSuccessListener { faces ->
                     lifecycleScope.launch(Dispatchers.Main) {
-                        if (faces.isNotEmpty()) {
+
+                        if ((System.currentTimeMillis() - startTimeMs) >= maxVerificationTimems) {
+                            Log.d(TAG, "Timeout reached")
+                            stopCameraPreview()
+                            return@launch
+                        }
+
+                        val rotation = imageProxy.imageInfo.rotationDegrees
+
+                        val frameBmp = rotateBitmap(
+                            image.toBitmap(), rotation, false, false
+                        )
+
+                        val face = faces.maxByOrNull { f -> f.boundingBox.height() }
+
+                        if (face == null) {
                             binding.textInfo.text = getString(R.string.detecting_face)
+                        } else if (face.boundingBox.left < 0.1 * frameBmp.width || face.boundingBox.right > 0.9 * frameBmp.width ||
+                            face.boundingBox.top < 0.1 * frameBmp.height || face.boundingBox.bottom > 0.9 * frameBmp.height
+                        ) {
+                            binding.textInfo.text = getString(R.string.face_not_centered)
+                        } else if (face.boundingBox.height() < (0.25 * frameBmp.height)) {
+                            binding.textInfo.text = getString(R.string.face_too_far)
+                        } else if (face.boundingBox.height() > (0.5 * frameBmp.height)) {
+                            binding.textInfo.text = getString(R.string.face_too_close)
+                        } else if (abs(face.headEulerAngleY) > 15 || abs(face.headEulerAngleX) > 15 || abs(
+                                face.headEulerAngleZ
+                            ) > 15
+                        ) {
+                            binding.textInfo.text = getString(R.string.face_invalid_angles)
+                        } else {
+                            binding.textInfo.text = getString(R.string.verifying_face)
 
                             // Transform cameraEmbeding to bitmap and preprocess the bitmap
                             val cameraEmbedding = imageProxyToBitmap(imageProxy)
 
-                            // Transform storedEmbeding to bitmap and preprocess the bitmap
-                            val storedBitmap =
-                                BitmapFactory.decodeByteArray(userFace, 0, userFace.size)
-                            val storedEmbedding = preprocessImage(storedBitmap)
-
-                            if (cameraEmbedding != null) {
-                                processImageWithTFLite(storedEmbedding, cameraEmbedding)
-                            } else {
-                                binding.textInfo.text = getString(R.string.face_not_centered)
-
-                            }
-                        } else {
-                            binding.textInfo.text = getString(R.string.face_invalid_angles)
+                            processImageWithTFLite(cameraEmbedding!!)
 
                         }
+
+
+//                        if (faces.isNotEmpty()) {
+//                            binding.textInfo.text = getString(R.string.detecting_face)
+//
+//                            // Transform cameraEmbeding to bitmap and preprocess the bitmap
+//                            val cameraEmbedding = imageProxyToBitmap(imageProxy)
+//
+//                            // Transform storedEmbeding to bitmap and preprocess the bitmap
+//                            val storedBitmap =
+//                                BitmapFactory.decodeByteArray(userFace, 0, userFace.size)
+//                            val storedEmbedding = preprocessImage(storedBitmap)
+//
+//                            if (cameraEmbedding != null) {
+//                                processImageWithTFLite(storedEmbedding, cameraEmbedding)
+//                            } else {
+//                                binding.textInfo.text = getString(R.string.face_not_centered)
+//
+//                            }
+//                        } else {
+//                            binding.textInfo.text = getString(R.string.face_invalid_angles)
+//
+//                        }
                         imageProxy.close()
                     }
                 }
@@ -274,40 +349,21 @@ class Verification2Fragment : DialogFragment() {
         return grayBitmap
     }
 
-    private fun processImageWithTFLite(storedImage: Bitmap?, cameraEmbedding: Bitmap) {
-        if (storedImage != null) {
-            val preprocessedStoredBitmap = storedImage
-            val preprocessedCameraBitmap = cameraEmbedding
+    private fun processImageWithTFLite(cameraEmbedding: Bitmap) {
+        val cameraOutputBuffer = runModel(cameraEmbedding)
 
-            val storedOutputBuffer = runModel(preprocessedStoredBitmap)
-            val cameraOutputBuffer = runModel(preprocessedCameraBitmap)
-
-            if (storedOutputBuffer.isNotEmpty() && cameraOutputBuffer.isNotEmpty()) {
-                val distance =
-                    calculateEuclideanDistance(storedOutputBuffer, cameraOutputBuffer)
-                Log.d(TAG, "Distance: $distance")
-                if (distance < THRESHOLD) {
-                    detectFaceJob?.cancel()
-                    detectAndDrawBoundingBox(preprocessedCameraBitmap, userName)
-                } else {
-//                      unsetImageView()
-                    binding.textInfo.text = "Rostos não correspondem"
-                }
-            } else {
-                Log.e(TAG, "Erro de tamanho de embedding")
-                binding.textInfo.text = "Erro de tamanho de embedding"
+        if (cameraOutputBuffer.isNotEmpty()) {
+            val distance =
+                calculateEuclideanDistance(storedEmbedding, cameraOutputBuffer)
+            Log.d(TAG, "Distance: $distance")
+            if (distance < THRESHOLD) {
+                detectAndDrawBoundingBox(cameraEmbedding, userName)
             }
         } else {
-            Log.d(TAG, "ByteArray do rosto é nulo")
-            binding.textInfo.text = "ByteArray do rosto é nulo"
+            Log.e(TAG, "Erro de tamanho de embedding")
+            binding.textInfo.text = "Erro de tamanho de embedding"
         }
-    }
 
-
-    private fun unsetImageView() {
-        binding.cameraPreview.visibility = View.VISIBLE
-        binding.animation.visibility = View.VISIBLE
-        binding.imageView.visibility = View.GONE
     }
 
     private fun runModel(bitmap: Bitmap): FloatArray {
@@ -341,7 +397,7 @@ class Verification2Fragment : DialogFragment() {
                 val face = faces.first()
                 val outputBitmap = drawBoundingBoxAndLabel(bitmap, face, label)
                 cameraProvider.unbindAll()
-                binding.textInfo.text = "Rostos correspondem"
+                binding.textInfo.visibility = View.INVISIBLE
                 binding.cameraPreview.visibility = View.INVISIBLE
                 binding.animation.visibility = View.GONE
                 binding.imageView.visibility = View.VISIBLE
@@ -393,6 +449,6 @@ class Verification2Fragment : DialogFragment() {
         private const val IMAGE_MEAN = 128.0f
         private const val IMAGE_STD = 128.0f
         private const val OUTPUT_SIZE = 192
-        private const val THRESHOLD = 0.78f
+        private const val THRESHOLD = 0.8f
     }
 }

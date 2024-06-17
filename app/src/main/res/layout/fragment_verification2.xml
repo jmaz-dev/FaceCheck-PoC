@@ -4,8 +4,7 @@
         xmlns:tools="http://schemas.android.com/tools"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:padding="24dp"
-        android:orientation="vertical"
+        android:padding="16dp"
         android:background="@color/md_theme_background"
         tools:context=".verification.Verification2Fragment">
 
@@ -51,6 +50,8 @@
             android:layout_width="0dp"
             android:layout_height="0dp"
             android:scaleType="centerCrop"
+            app:layout_constraintWidth_max="400dp"
+            app:layout_constraintHeight_max="400dp"
             app:layout_constraintStart_toStartOf="@id/camera_preview"
             app:layout_constraintEnd_toEndOf="@id/camera_preview"
             app:layout_constraintTop_toTopOf="@id/camera_preview"

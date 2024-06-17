@@ -2,17 +2,25 @@ package com.example.facecheckpoc
 
 import android.content.Context
 import android.os.Bundle
+import android.util.Log
 import android.view.View
 import android.view.inputmethod.InputMethodManager
 import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
+import androidx.camera.core.ExperimentalGetImage
 import androidx.lifecycle.Observer
 import androidx.lifecycle.ViewModelProvider
 import com.example.facecheckpoc.data.UserModel
 import com.example.facecheckpoc.databinding.ActivityMainBinding
 import com.example.facecheckpoc.verification.Verification2Fragment
+import kotlinx.coroutines.DelicateCoroutinesApi
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.launch
+import org.opencv.android.OpenCVLoader
 
 
+@ExperimentalGetImage
 class MainActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityMainBinding
@@ -48,9 +56,11 @@ class MainActivity : AppCompatActivity() {
         }
 
         // Adicione a fragment ao gerenciador de fragments
-        supportFragmentManager.beginTransaction()
-            .add(R.id.fragment_container, verification2Fragment)
-            .commit()
+//        supportFragmentManager.beginTransaction()
+//            .add(R.id.fragment_container, verification2Fragment)
+//            .commit()
+        verification2Fragment.show(supportFragmentManager, "dialog")
+
     }
 
 
@@ -80,10 +90,24 @@ class MainActivity : AppCompatActivity() {
         })
     }
 
-    fun fecharTeclado() {
+    private fun fecharTeclado() {
         val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
         imm.hideSoftInputFromWindow(currentFocus?.windowToken ?: View(this).windowToken, 0)
     }
+
+
+    @OptIn(DelicateCoroutinesApi::class)
+    companion object {
+        init {
+            GlobalScope.launch(Dispatchers.IO) {
+                if (!OpenCVLoader.initDebug())
+                    Log.d("ERROR", "Unable to load OpenCV")
+                else
+                    Log.d("SUCCESS", "OpenCV loaded")
+            }
+        }
+    }
+
 }
 
 

@@ -12,10 +12,10 @@
     <string name="verifying_face">Verificando face...</string>
     <string name="back_camera">Câmera traseira</string>
     <string name="detecting_face">Detectando rosto...</string>
-    <string name="face_not_centered">Centralize o rosto na câmera</string>
-    <string name="face_too_far">Face muito distante</string>
-    <string name="face_too_close">Face muito próxima</string>
-    <string name="face_invalid_angles">Não foi possível verficar a face!</string>
+    <string name="face_not_centered">Centralize o rosto na câmera...</string>
+    <string name="face_too_far">Face muito distante...</string>
+    <string name="face_too_close">Face muito próxima...</string>
+    <string name="face_invalid_angles">Face deve estar olhando para a frente…</string>
     <!-- TODO: Remove or change this placeholder text -->
     <string name="hello_blank_fragment">Hello blank fragment</string>
 </resources>
