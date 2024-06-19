@@ -38,6 +38,8 @@ class MainActivity : AppCompatActivity() {
         enableEdgeToEdge()
         setContentView(binding.root)
 
+        
+
         binding.buttonVerify.setOnClickListener {
             cpfVerifcation()
         }

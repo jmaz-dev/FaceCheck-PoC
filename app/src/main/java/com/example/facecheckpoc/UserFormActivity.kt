@@ -1,11 +1,18 @@
 package com.example.facecheckpoc
 
 import android.Manifest
+import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.graphics.ImageDecoder
+import android.net.Uri
+import android.os.Build
 import android.os.Bundle
+import android.os.Environment
+import android.provider.MediaStore
 import android.util.Base64
 import android.util.Log
 import android.view.Menu
@@ -15,21 +22,36 @@ import android.widget.Toast
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.annotation.OptIn
+import androidx.annotation.RequiresApi
 import androidx.appcompat.app.AppCompatActivity
+import androidx.camera.core.ExperimentalGetImage
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import androidx.core.content.FileProvider
+import androidx.core.graphics.scale
 import androidx.lifecycle.ViewModelProvider
 import com.example.facecheckpoc.data.UserModel
 import com.example.facecheckpoc.databinding.ActivityFormUserBinding
+import com.example.facecheckpoc.utils.scale
 import java.io.ByteArrayOutputStream
+import java.io.File
 import java.nio.ByteBuffer
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+
+private const val bitmapSize: Int = 1280
 
 class UserFormActivity() : AppCompatActivity(), View.OnClickListener {
 
     private lateinit var binding: ActivityFormUserBinding
     private lateinit var viewModel: UserViewModel
-    private lateinit var takePictureLauncher: ActivityResultLauncher<Void?>
+    private lateinit var takePictureLauncher: ActivityResultLauncher<Uri>
+    private lateinit var photoFile: File
     private var encodedImage: ByteArray? = null
+    private lateinit var photoUri: Uri
+    private lateinit var currentPhotoPath: String
 
     companion object {
         private const val REQUEST_CAMERA_PERMISSION = 1
@@ -37,6 +59,7 @@ class UserFormActivity() : AppCompatActivity(), View.OnClickListener {
         private const val TAG = "UserFormActivity"
     }
 
+    @RequiresApi(Build.VERSION_CODES.P)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -63,6 +86,7 @@ class UserFormActivity() : AppCompatActivity(), View.OnClickListener {
         return true
     }
 
+    @OptIn(ExperimentalGetImage::class)
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
         when (item.itemId) {
             R.id.action_settings_sub1 -> {
@@ -99,7 +123,7 @@ class UserFormActivity() : AppCompatActivity(), View.OnClickListener {
         if (requestCode == REQUEST_CAMERA_PERMISSION) {
             if ((grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED)) {
                 // Permission was granted, launch the camera
-                takePictureLauncher.launch(null)
+
             } else {
                 // Permission denied
                 useToast("Permissão da câmera negada")
@@ -107,31 +131,68 @@ class UserFormActivity() : AppCompatActivity(), View.OnClickListener {
         }
     }
 
+    @RequiresApi(Build.VERSION_CODES.P)
     private fun pictureLauncher() {
         takePictureLauncher =
-            registerForActivityResult(ActivityResultContracts.TakePicturePreview()) { bitmap ->
-                if (bitmap != null) {
-                    // Exibir a imagem no ImageView
+            registerForActivityResult(ActivityResultContracts.TakePicture()) { success ->
+                if (success) {
+                    // Imagem capturada com sucesso, agora você pode acessar a
+                    val bitmap = ImageDecoder.decodeBitmap(
+                        ImageDecoder.createSource(
+                            contentResolver,
+                            photoUri
+                        )
+                    )
+                    bitmap.scale(bitmapSize)
+//                    val bitmap = BitmapFactory.decodeFile(photoFile.absolutePath)
+                    Log.d("ImageSize", bitmap.width.toString() + "x" + bitmap.height)
+
                     binding.imagePreview.visibility = View.VISIBLE
                     binding.imageCapture.visibility = View.INVISIBLE
                     binding.imagePreview.setImageBitmap(bitmap)
                     IS_PICTURE_TAKED = 1
 
-                    // Converta o bitmap para um array de bytes
+                    // Converta o bitmap para um array de bytes (compressão opcional)
                     val byteArrayOutputStream = ByteArrayOutputStream()
-                    bitmap.compress(Bitmap.CompressFormat.JPEG, 100, byteArrayOutputStream)
+                    bitmap.compress(Bitmap.CompressFormat.JPEG, 90, byteArrayOutputStream)
                     val byteArray = byteArrayOutputStream.toByteArray()
 
-                    // Converta o array de bytes para uma string Base64
+                    // Armazene o byteArray conforme necessário
                     encodedImage = byteArray
-
-
                 } else {
-                    Log.d(TAG, "Bitmap is null")
+                    // Falha ao capturar imagem
+                    Log.d(TAG, "Failed to capture image")
                     useToast("Failed to capture image")
                 }
             }
     }
+
+//    private fun pictureLauncher() {
+//        takePictureLauncher =
+//            registerForActivityResult(ActivityResultContracts.TakePicturePreview()) { bitmap ->
+//                if (bitmap != null) {
+//
+//                    // Exibir a imagem no ImageView
+//                    binding.imagePreview.visibility = View.VISIBLE
+//                    binding.imageCapture.visibility = View.INVISIBLE
+//                    binding.imagePreview.setImageBitmap(bitmap)
+//                    IS_PICTURE_TAKED = 1
+//
+//                    // Converta o bitmap para um array de bytes
+//                    val byteArrayOutputStream = ByteArrayOutputStream()
+//                    bitmap.compress(Bitmap.CompressFormat.PNG, 100, byteArrayOutputStream)
+//                    val byteArray = byteArrayOutputStream.toByteArray()
+//
+//                    // Converta o array de bytes para uma string Base64
+//                    encodedImage = byteArray
+//                    Log.d(TAG, "Captured image quality: ${byteArray.size} bytes")
+//
+//                } else {
+//                    Log.d(TAG, "Bitmap is null")
+//                    useToast("Failed to capture image")
+//                }
+//            }
+//    }
 
     private fun handleImageCapture() {
 
@@ -146,7 +207,22 @@ class UserFormActivity() : AppCompatActivity(), View.OnClickListener {
                 REQUEST_CAMERA_PERMISSION
             )
         } else {
-            takePictureLauncher.launch(null)
+            photoFile = createImageFile()
+            photoUri = FileProvider.getUriForFile(
+                this,
+                "${applicationContext.packageName}.provider",
+                photoFile
+            )
+            takePictureLauncher.launch(photoUri)
+        }
+    }
+
+    private fun createImageFile(): File {
+        val timestamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
+        val storageDir = getExternalFilesDir(Environment.DIRECTORY_PICTURES)
+        return File.createTempFile("JPEG_${timestamp}_", ".jpg", storageDir).apply {
+            // Save a file: path for use with ACTION_VIEW intents
+            currentPhotoPath = absolutePath
         }
     }
 

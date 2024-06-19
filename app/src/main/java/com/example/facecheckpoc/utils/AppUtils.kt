@@ -142,3 +142,95 @@ fun rotateBitmap(
 
     return dstBitmap
 }
+
+fun Bitmap.scale(maxSize: Int): Bitmap {
+    val outWidth: Int
+    val outHeight: Int
+    val inWidth: Int = width
+    val inHeight: Int = height
+    if (inWidth > inHeight) {
+        outWidth = maxSize
+        outHeight = inHeight * maxSize / inWidth
+    } else {
+        outHeight = maxSize
+        outWidth = inWidth * maxSize / inHeight
+    }
+
+    return Bitmap.createScaledBitmap(this, outWidth, outHeight, false)
+}
+
+fun getAlignedFace(bitmap: Bitmap, face: Face, inputSize: Int): Bitmap? {
+    try {
+        val padding = 0.0f
+
+        val defaultShape = floatArrayOf(
+            0.3419f, 0.4615f,
+            0.6565f, 0.4598f,
+            0.5002f, 0.6305f,
+            0.3709f, 0.8247f,
+            0.6315f, 0.8232f
+        )
+
+        val leftEye = face.getLandmark(FaceLandmark.LEFT_EYE)
+        val rightEye = face.getLandmark(FaceLandmark.RIGHT_EYE)
+        val nose = face.getLandmark(FaceLandmark.NOSE_BASE)
+        val leftMouth = face.getLandmark(FaceLandmark.MOUTH_LEFT)
+        val rightMouth = face.getLandmark(FaceLandmark.MOUTH_RIGHT)
+
+        if (leftEye == null || rightEye == null || nose == null || leftMouth == null || rightMouth == null) {
+            Log.e("AlignedFace", "Failed to detect face landmarks.")
+            return null
+        }
+
+        val landmarks = floatArrayOf(
+            leftEye.position.x, leftEye.position.y,
+            rightEye.position.x, rightEye.position.y,
+            nose.position.x, nose.position.y,
+            leftMouth.position.x, leftMouth.position.y,
+            rightMouth.position.x, rightMouth.position.y
+        )
+
+        for (i in defaultShape.indices) {
+            defaultShape[i] = defaultShape[i] * inputSize + inputSize * (padding / 2)
+        }
+
+        val src = MatOfPoint2f(
+            Point(landmarks[0].toDouble(), landmarks[1].toDouble()),
+            Point(landmarks[2].toDouble(), landmarks[3].toDouble()),
+            Point(landmarks[4].toDouble(), landmarks[5].toDouble()),
+            Point(landmarks[6].toDouble(), landmarks[7].toDouble()),
+            Point(landmarks[8].toDouble(), landmarks[9].toDouble())
+        )
+
+        val dst = MatOfPoint2f(
+            Point(defaultShape[0].toDouble(), defaultShape[1].toDouble()),
+            Point(defaultShape[2].toDouble(), defaultShape[3].toDouble()),
+            Point(defaultShape[4].toDouble(), defaultShape[5].toDouble()),
+            Point(defaultShape[6].toDouble(), defaultShape[7].toDouble()),
+            Point(defaultShape[8].toDouble(), defaultShape[9].toDouble())
+        )
+
+        val affineMatrix = Calib3d.estimateAffine2D(src, dst)
+
+        val rgbMat = Mat()
+        Utils.bitmapToMat(bitmap, rgbMat)
+
+        val alignFace = Mat()
+        Imgproc.warpAffine(
+            rgbMat,
+            alignFace,
+            affineMatrix,
+            Size(inputSize.toDouble(), inputSize.toDouble()),
+            Imgproc.INTER_CUBIC
+        )
+
+        val alignedBitmap =
+            Bitmap.createBitmap(alignFace.cols(), alignFace.rows(), Bitmap.Config.ARGB_8888)
+        Utils.matToBitmap(alignFace, alignedBitmap)
+
+        return alignedBitmap
+    } catch (e: Exception) {
+        Log.e("AlignedFace", "Exception in getAlignedFace: ${e.message}")
+        return null
+    }
+}
