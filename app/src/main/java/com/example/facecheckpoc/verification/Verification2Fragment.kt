@@ -95,7 +95,7 @@ class Verification2Fragment : DialogFragment() {
         container: ViewGroup?,
         savedInstanceState: Bundle?
     ): View {
-        binding = FragmentVerification2Binding.inflate(LayoutInflater.from(context))
+        binding = FragmentVerification2Binding.inflate(inflater, container, false)
         binding.cancelButton.setOnClickListener { dismiss() }
         binding.cancelButtonView.setOnClickListener { dismiss() }
 
@@ -161,6 +161,7 @@ class Verification2Fragment : DialogFragment() {
     private fun generateCompareEmbedding(callback: (FloatArray) -> Unit) {
         if (userFace.isNotEmpty()) {
             val storedBitmap = BitmapFactory.decodeByteArray(userFace, 0, userFace.size)
+            Log.d("BitmapSize", "Width: ${storedBitmap.width}, Height: ${storedBitmap.height}")
             val inputImage = InputImage.fromBitmap(storedBitmap, 0)
             var alignedFace: Bitmap? = null
 

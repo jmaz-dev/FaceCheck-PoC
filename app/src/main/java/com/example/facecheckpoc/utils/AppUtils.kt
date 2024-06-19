@@ -148,12 +148,13 @@ fun Bitmap.scale(maxSize: Int): Bitmap {
     val outHeight: Int
     val inWidth: Int = width
     val inHeight: Int = height
+
     if (inWidth > inHeight) {
         outWidth = maxSize
-        outHeight = inHeight * maxSize / inWidth
+        outHeight = (inHeight * maxSize) / inWidth
     } else {
         outHeight = maxSize
-        outWidth = inWidth * maxSize / inHeight
+        outWidth = (inWidth * maxSize) / inHeight
     }
 
     return Bitmap.createScaledBitmap(this, outWidth, outHeight, false)

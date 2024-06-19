@@ -138,23 +138,20 @@ class UserFormActivity() : AppCompatActivity(), View.OnClickListener {
                 if (success) {
                     // Imagem capturada com sucesso, agora você pode acessar a
                     val bitmap = ImageDecoder.decodeBitmap(
-                        ImageDecoder.createSource(
-                            contentResolver,
-                            photoUri
-                        )
+                        ImageDecoder.createSource(contentResolver, photoUri)
                     )
-                    bitmap.scale(bitmapSize)
+                    val scaledBitmap = bitmap.scale(1280)
 //                    val bitmap = BitmapFactory.decodeFile(photoFile.absolutePath)
-                    Log.d("ImageSize", bitmap.width.toString() + "x" + bitmap.height)
+                    Log.d("ImageSize", scaledBitmap.width.toString() + "x" + scaledBitmap.height)
 
                     binding.imagePreview.visibility = View.VISIBLE
                     binding.imageCapture.visibility = View.INVISIBLE
-                    binding.imagePreview.setImageBitmap(bitmap)
+                    binding.imagePreview.setImageBitmap(scaledBitmap)
                     IS_PICTURE_TAKED = 1
 
                     // Converta o bitmap para um array de bytes (compressão opcional)
                     val byteArrayOutputStream = ByteArrayOutputStream()
-                    bitmap.compress(Bitmap.CompressFormat.JPEG, 90, byteArrayOutputStream)
+                    scaledBitmap.compress(Bitmap.CompressFormat.JPEG, 90, byteArrayOutputStream)
                     val byteArray = byteArrayOutputStream.toByteArray()
 
                     // Armazene o byteArray conforme necessário
@@ -166,33 +163,6 @@ class UserFormActivity() : AppCompatActivity(), View.OnClickListener {
                 }
             }
     }
-
-//    private fun pictureLauncher() {
-//        takePictureLauncher =
-//            registerForActivityResult(ActivityResultContracts.TakePicturePreview()) { bitmap ->
-//                if (bitmap != null) {
-//
-//                    // Exibir a imagem no ImageView
-//                    binding.imagePreview.visibility = View.VISIBLE
-//                    binding.imageCapture.visibility = View.INVISIBLE
-//                    binding.imagePreview.setImageBitmap(bitmap)
-//                    IS_PICTURE_TAKED = 1
-//
-//                    // Converta o bitmap para um array de bytes
-//                    val byteArrayOutputStream = ByteArrayOutputStream()
-//                    bitmap.compress(Bitmap.CompressFormat.PNG, 100, byteArrayOutputStream)
-//                    val byteArray = byteArrayOutputStream.toByteArray()
-//
-//                    // Converta o array de bytes para uma string Base64
-//                    encodedImage = byteArray
-//                    Log.d(TAG, "Captured image quality: ${byteArray.size} bytes")
-//
-//                } else {
-//                    Log.d(TAG, "Bitmap is null")
-//                    useToast("Failed to capture image")
-//                }
-//            }
-//    }
 
     private fun handleImageCapture() {
 
