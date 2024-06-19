@@ -25,6 +25,7 @@ import com.example.facecheckpoc.UserFormActivity
 import com.example.facecheckpoc.databinding.FragmentVerification2Binding
 import com.example.facecheckpoc.utils.getAlignedFace
 import com.example.facecheckpoc.utils.rotateBitmap
+import com.example.facecheckpoc.utils.scale
 import com.example.facecheckpoc.utils.setWidthPercent
 import com.example.facecheckpoc.utils.toBitmap
 import com.google.mlkit.vision.common.InputImage
@@ -163,8 +164,6 @@ class Verification2Fragment : DialogFragment() {
             val inputImage = InputImage.fromBitmap(storedBitmap, 0)
             var alignedFace: Bitmap? = null
 
-            Log.d("ImageSize", inputImage.width.toString() + "x" + inputImage.height)
-
             faceDetector.process(inputImage)
                 .addOnSuccessListener { faces ->
                     val face = faces.maxByOrNull { it.boundingBox.height() }
@@ -299,12 +298,11 @@ class Verification2Fragment : DialogFragment() {
                             binding.textInfo.text = getString(R.string.verifying_face)
 
                             val alignedFace = getAlignedFace(frameBmp, face, INPUT_SIZE)
-                            Log.d(TAG, "AlignedFace: $alignedFace")
                             if (alignedFace != null) {
                                 Log.d(TAG, "AlignedFace: $alignedFace")
                                 val preprocessedFaceBitmap = preprocessImage(alignedFace)
                                 val cameraEmbedding = runModel(preprocessedFaceBitmap)
-                                processImageWithTFLite(preprocessedFaceBitmap, cameraEmbedding)
+                                processImageWithTFLite(frameBmp, cameraEmbedding)
                             } else {
                                 Log.e(TAG, "Erro ao alinhar o rosto")
                             }
@@ -378,7 +376,6 @@ class Verification2Fragment : DialogFragment() {
                 val face = faces.first()
                 val outputBitmap = drawBoundingBoxAndLabel(bitmap, face, label)
                 cameraProvider.unbindAll()
-                binding.textInfo.visibility = View.INVISIBLE
                 binding.cameraPreview.visibility = View.INVISIBLE
                 binding.animation.visibility = View.GONE
                 binding.imageView.visibility = View.VISIBLE
@@ -404,11 +401,11 @@ class Verification2Fragment : DialogFragment() {
         val paint = Paint().apply {
             color = Color.GREEN
             style = Paint.Style.STROKE
-            strokeWidth = 1f
+            strokeWidth = 2f
         }
         val textPaint = Paint().apply {
             color = Color.GREEN
-            textSize = 10f
+            textSize = 18f
             typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
         }
 

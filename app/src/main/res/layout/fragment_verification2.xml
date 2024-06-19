@@ -48,7 +48,7 @@
         android:id="@+id/imageView"
         android:layout_width="0dp"
         android:layout_height="0dp"
-        android:scaleType="centerCrop"
+        android:scaleType="fitCenter"
         app:layout_constraintStart_toStartOf="@id/camera_preview"
         app:layout_constraintEnd_toEndOf="@id/camera_preview"
         app:layout_constraintTop_toTopOf="@id/camera_preview"
